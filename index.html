@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last Man Standing — Premier League</title>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --purple: #37003c;
+            --pink: #e90052;
+            --green: #10b981;
+            --light: #f4f4f6;
+            --white: #ffffff;
+            --grey: #6b7280;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--light);
+            color: #111;
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--purple);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        header h1 { font-size: 22px; font-weight: 800; }
+        header .subtitle { font-size: 13px; opacity: 0.65; margin-top: 2px; }
+
+        .badge {
+            background: var(--pink);
+            color: white;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .layout {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 24px 16px;
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 720px) {
+            .layout { grid-template-columns: 1fr; }
+        }
+
+        .center-wrap {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .card h2 {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--purple);
+        }
+
+        .phase-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--pink);
+            margin-bottom: 4px;
+        }
+
+        .help-text {
+            font-size: 13px;
+            color: var(--grey);
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: opacity 0.15s, transform 0.1s;
+            text-align: center;
+        }
+
+        .btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+
+        .btn-primary { background: var(--purple); color: white; }
+        .btn-danger  { background: var(--pink); color: white; }
+        .btn-success { background: var(--green); color: white; }
+        .btn-outline { background: white; color: var(--purple); border: 2px solid var(--purple); }
+        .btn-sm { padding: 6px 12px; font-size: 13px; }
+        .btn-full { width: 100%; }
+
+        input[type="text"] {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        input[type="text"]:focus { border-color: var(--purple); }
+
+        select {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            width: 100%;
+            background: white;
+            cursor: pointer;
+            outline: none;
+        }
+
+        select:focus { border-color: var(--purple); }
+
+        .divider { height: 1px; background: var(--border); margin: 18px 0; }
+
+        .player-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .player-row:last-child { border-bottom: none; }
+        .player-name { flex: 1; font-weight: 600; font-size: 14px; }
+
+        .status-pill {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            white-space: nowrap;
+        }
+
+        .pill-in     { background: #d1fae5; color: #065f46; }
+        .pill-out    { background: #fee2e2; color: #991b1b; }
+        .pill-winner { background: #fef3c7; color: #78350f; }
+        .pill-waiting { background: #f3f4f6; color: #6b7280; }
+
+        .remove-btn {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 17px;
+            padding: 0 4px;
+            line-height: 1;
+            opacity: 0.7;
+        }
+
+        .remove-btn:hover { opacity: 1; }
+
+        .result-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .result-row:last-child { border-bottom: none; }
+
+        .result-row label {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: var(--green);
+            flex-shrink: 0;
+        }
+
+        .summary-box {
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+
+        .summary-box h3 { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+        .summary-box ul { padding-left: 16px; font-size: 13px; line-height: 1.8; }
+        .summary-box:last-of-type { margin-bottom: 0; }
+
+        .box-green { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .box-green h3 { color: #065f46; }
+        .box-red   { background: #fff1f2; border: 1px solid #fecdd3; }
+        .box-red h3 { color: #9f1239; }
+
+        .winner-banner {
+            background: linear-gradient(135deg, #37003c, #7c3aed);
+            color: white;
+            border-radius: 12px;
+            padding: 36px 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .winner-banner .trophy { font-size: 52px; margin-bottom: 10px; }
+        .winner-banner .winner-label { font-size: 13px; opacity: 0.75; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.8px; }
+        .winner-banner .winner-name { font-size: 34px; font-weight: 900; }
+        .winner-banner .rounds-survived { font-size: 13px; opacity: 0.7; margin-top: 10px; }
+
+        .history-wrap { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th {
+            background: var(--light);
+            padding: 6px 8px;
+            text-align: left;
+            font-weight: 700;
+            color: var(--grey);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 6px 8px;
+            border-top: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .pick-win { color: #065f46; font-weight: 700; }
+        .pick-out { color: #991b1b; font-weight: 700; }
+
+        .empty-state {
+            text-align: center;
+            padding: 24px 0;
+            color: var(--grey);
+            font-size: 13px;
+        }
+
+        .section-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--grey);
+            margin-bottom: 8px;
+        }
+
+        .elim-name { color: #9ca3af; }
+
+        /* Game code display */
+        .code-display {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            color: var(--purple);
+            text-align: center;
+            padding: 24px 0 8px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .code-hint {
+            font-size: 12px;
+            color: var(--grey);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .share-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            padding: 8px;
+            background: #f3f0f6;
+            border: 1px dashed #c084fc;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--purple);
+            cursor: pointer;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .share-btn:hover { background: #ede9f7; }
+
+        /* Pick confirmation */
+        .picked-confirm {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 14px 16px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #065f46;
+        }
+
+        /* Home screen */
+        .home-icon { font-size: 48px; text-align: center; padding-bottom: 12px; }
+
+        .error-msg {
+            margin-top: 12px;
+            color: #dc2626;
+            font-size: 13px;
+            text-align: center;
+            display: none;
+        }
+
+        .loading-wrap {
+            text-align: center;
+            padding: 48px 24px;
+        }
+
+        .loading-wrap .spin { font-size: 32px; margin-bottom: 16px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Feature 1 — Confirmation screen ───────────────── */
+        .pick-confirmation {
+            text-align: center;
+            padding: 32px 24px;
+        }
+        .pick-confirmation .conf-team {
+            font-size: 26px;
+            font-weight: 900;
+            color: var(--purple);
+            margin: 10px 0 6px;
+        }
+        .pick-confirmation .conf-meta {
+            font-size: 13px;
+            color: var(--grey);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        /* ── Feature 2 — Countdown ──────────────────────────── */
+        .countdown-box {
+            background: var(--purple);
+            color: white;
+            border-radius: 10px;
+            padding: 12px 16px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .countdown-box .cd-label {
+            font-size: 10px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+        .countdown-box .cd-time {
+            font-size: 26px;
+            font-weight: 900;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 2px;
+        }
+        .countdown-box.expired { background: var(--pink); }
+
+        /* ── Feature 4 — Team grid ──────────────────────────── */
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .team-btn {
+            padding: 10px 6px;
+            min-height: 44px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            background: white;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: border-color 0.12s, background 0.12s;
+            color: #111;
+            line-height: 1.3;
+        }
+        .team-btn:hover:not(:disabled) { border-color: var(--purple); background: #faf5ff; }
+        .team-btn.team-selected { border-color: var(--green); background: #f0fdf4; color: #065f46; }
+        .team-btn.team-used {
+            background: #f9fafb;
+            color: #c4c4c4;
+            border-color: #e5e7eb;
+            cursor: not-allowed;
+            text-decoration: line-through;
+            font-weight: 400;
+        }
+
+        /* ── Feature 5 — Pick reveal ────────────────────────── */
+        .reveal-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .reveal-row:last-child { border-bottom: none; }
+        .reveal-row .reveal-team {
+            flex: 1;
+            color: var(--grey);
+            font-size: 13px;
+            text-align: right;
+        }
+
+        /* ── Feature 6 — Survival banner ────────────────────── */
+        .survival-banner {
+            border-radius: 10px;
+            padding: 14px 18px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .survival-banner.alive  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+        .survival-banner.elim   { background: #fff1f2; border: 1px solid #fecdd3; }
+        .survival-banner .sb-icon  { font-size: 26px; flex-shrink: 0; }
+        .survival-banner .sb-title { font-size: 15px; font-weight: 700; }
+        .survival-banner .sb-sub   { font-size: 12px; color: var(--grey); margin-top: 2px; }
+
+        /* ── Feature 7 — Mobile ─────────────────────────────── */
+        .btn { min-height: 44px; }
+        .btn-sm { min-height: 36px; }
+
+        @media (max-width: 480px) {
+            header { padding: 12px 14px; }
+            header h1 { font-size: 18px; }
+            .center-wrap { padding: 14px 12px; gap: 14px; }
+            .card { padding: 18px 14px; }
+            .team-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+            .team-btn { font-size: 11px; padding: 8px 4px; }
+            .code-display { font-size: 36px; letter-spacing: 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>⚽ Last Man Standing</h1>
+        <div class="subtitle">Premier League Survivor</div>
+    </div>
+    <div id="headerRight"></div>
+</header>
+
+<div id="app"></div>
+
+<script>
+// ── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+// REPLACE THE VALUES BELOW with your Firebase config from Project Settings
+const firebaseConfig = {
+    apiKey:            "AIzaSyDesqpACAf9bosKpD1cNcN5VbJp_MbXiV4",
+    authDomain:        "last-man-standing-51f6e.firebaseapp.com",
+    databaseURL:       "https://last-man-standing-51f6e-default-rtdb.firebaseio.com",
+    projectId:         "last-man-standing-51f6e",
+    storageBucket:     "last-man-standing-51f6e.firebasestorage.app",
+    messagingSenderId: "168038923018",
+    appId:             "1:168038923018:web:010798e715eb27274dd8f3"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ── TEAMS ────────────────────────────────────────────────────────────────────
+const ALL_TEAMS = [
+    "Arsenal","Aston Villa","Bournemouth","Brentford","Brighton",
+    "Chelsea","Crystal Palace","Everton","Fulham","Ipswich Town",
+    "Leicester City","Liverpool","Man City","Man United","Newcastle",
+    "Nottm Forest","Southampton","Tottenham","West Ham","Wolves"
+];
+
+// ── SESSION STATE ────────────────────────────────────────────────────────────
+let gameCode     = localStorage.getItem('lms_code');
+let role         = localStorage.getItem('lms_role');   // 'host' | 'player'
+let myPlayerId   = localStorage.getItem('lms_pid');
+let G            = null;   // live game snapshot from Firebase
+let gameRef      = null;
+let gameListener = null;
+
+// Sub-view state (local only, not Firebase)
+let playerSubView    = 'main'; // 'main' | 'confirmation' | 'history'
+let lastConfirmedTeam = null;
+let countdownTimer    = null;
+
+// ── UTILITIES ────────────────────────────────────────────────────────────────
+function esc(s) {
+    return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function genCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    return Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+function players()      { return Object.values(G.players || {}); }
+function activePlayers(){ return players().filter(p => p.active); }
+function getPlayer(id)  { return (G.players || {})[id]; }
+
+function rounds() {
+    return Object.values(G.rounds || {}).sort((a, b) => a.id - b.id);
+}
+
+function currentRound() {
+    const rs = rounds();
+    return rs[rs.length - 1] || null;
+}
+
+function availableTeams(playerId) {
+    const p = getPlayer(playerId);
+    if (!p) return ALL_TEAMS;
+    const used = p.usedTeams || {};
+    return ALL_TEAMS.filter(t => !used[t]);
+}
+
+// ── Countdown helpers ─────────────────────────────────────────────────────────
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function formatCountdown(ms) {
+    if (ms <= 0) return 'Closed';
+    const s = Math.floor(ms / 1000);
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (d > 0) return `${d}d ${pad(h)}h ${pad(m)}m`;
+    if (h > 0) return `${pad(h)}h ${pad(m)}m ${pad(sec)}s`;
+    return `${pad(m)}m ${pad(sec)}s`;
+}
+
+function startCountdown(closeTime) {
+    if (countdownTimer) clearInterval(countdownTimer);
+    if (!closeTime) return;
+    const tick = () => {
+        const el = document.getElementById('countdownDisplay');
+        if (!el) { clearInterval(countdownTimer); countdownTimer = null; return; }
+        const ms = new Date(closeTime) - Date.now();
+        el.textContent = formatCountdown(ms);
+        el.closest('.countdown-box')?.classList.toggle('expired', ms <= 0);
+    };
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+}
+
+function formatDatetimeLocal(iso) {
+    if (!iso) return '';
+    return new Date(iso).toISOString().slice(0, 16);
+}
+
+// ── Feature 6 — Survival banner ───────────────────────────────────────────────
+
+function renderSurvivalBanner() {
+    const p = getPlayer(myPlayerId);
+    if (!p) return '';
+    const doneCount = rounds().filter(r => r.status === 'done').length;
+
+    if (!p.active) {
+        const elimRound = rounds().find(r => r.id === p.eliminatedRound);
+        const lastPick  = elimRound ? (elimRound.picks || {})[myPlayerId] : null;
+        return `<div class="survival-banner elim">
+            <div class="sb-icon">❌</div>
+            <div>
+                <div class="sb-title">Eliminated — Round ${p.eliminatedRound}</div>
+                ${lastPick?.team ? `<div class="sb-sub">${esc(lastPick.team)} didn't win</div>` : ''}
+            </div>
+        </div>`;
+    }
+    return `<div class="survival-banner alive">
+        <div class="sb-icon">✅</div>
+        <div>
+            <div class="sb-title">Still in!</div>
+            <div class="sb-sub">${doneCount > 0 ? `Survived ${doneCount} round${doneCount !== 1 ? 's' : ''}` : 'Game in progress'}</div>
+        </div>
+    </div>`;
+}
+
+// ── Feature 3 — History link button ──────────────────────────────────────────
+
+function renderMyPickHistoryBtn() {
+    const done = rounds().filter(r => r.status === 'done');
+    if (!done.length) return '';
+    return `<button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='history';render()">
+        📋 View my pick history
+    </button>`;
+}
+
+// ── Feature 5 — Round pick reveal ────────────────────────────────────────────
+
+function renderRoundPickReveal(round) {
+    const picks = Object.values(round.picks || {});
+    if (!picks.length) return '';
+    const rows = picks.map(pick => {
+        const p = getPlayer(pick.playerId);
+        const isMe = pick.playerId === myPlayerId;
+        let pill = '';
+        if (pick.result === 'win') pill = '<span class="status-pill pill-in">✓ Won</span>';
+        else if (pick.result === 'out') pill = '<span class="status-pill pill-out">✕ Out</span>';
+        return `<div class="reveal-row">
+            <span style="font-weight:${isMe ? '700' : '500'}">${esc(p?.name || pick.playerId)}${isMe ? ' <span style="font-size:11px;font-weight:400;color:var(--grey)">(you)</span>' : ''}</span>
+            <span class="reveal-team">${esc(pick.team || '—')}</span>
+            ${pill}
+        </div>`;
+    }).join('');
+    return `<div class="card">
+        <h2>Round ${round.id} — All Picks</h2>
+        ${rows}
+    </div>`;
+}
+
+// ── FIREBASE ACTIONS ─────────────────────────────────────────────────────────
+
+async function createGame() {
+    showLoading();
+    let code;
+    for (let i = 0; i < 10; i++) {
+        code = genCode();
+        const snap = await db.ref(`games/${code}`).once('value');
+        if (!snap.exists()) break;
+    }
+
+    await db.ref(`games/${code}`).set({
+        status: 'setup',
+        winner: null,
+        nextId: 1,
+        players: {},
+        rounds: {}
+    });
+
+    localStorage.setItem('lms_code', code);
+    localStorage.setItem('lms_role', 'host');
+    localStorage.removeItem('lms_pid');
+    gameCode = code; role = 'host'; myPlayerId = null;
+    listenToGame();
+}
+
+async function joinGame(code, name) {
+    code = code.toUpperCase().trim();
+    name = name.trim();
+    if (!code || !name) { showHomeError('Enter both a game code and your name.'); return; }
+
+    showLoading();
+
+    const snap = await db.ref(`games/${code}`).once('value');
+    if (!snap.exists()) { showHomeError('Game not found — double-check the code.'); return; }
+
+    const game = snap.val();
+    if (game.status !== 'setup') { showHomeError('That game has already started.'); return; }
+
+    const taken = Object.values(game.players || {}).some(
+        p => p.name.toLowerCase() === name.toLowerCase()
+    );
+    if (taken) { showHomeError('That name is already taken. Try a different one.'); return; }
+
+    const nextId = game.nextId || 1;
+    const pid = 'p' + nextId;
+
+    await db.ref(`games/${code}/players/${pid}`).set({
+        id: pid, name, active: true, usedTeams: {}, eliminatedRound: null
+    });
+    await db.ref(`games/${code}/nextId`).set(nextId + 1);
+
+    localStorage.setItem('lms_code', code);
+    localStorage.setItem('lms_role', 'player');
+    localStorage.setItem('lms_pid', pid);
+    gameCode = code; role = 'player'; myPlayerId = pid;
+    listenToGame();
+}
+
+function listenToGame() {
+    if (gameRef) { gameRef.off('value', gameListener); }
+    gameRef = db.ref(`games/${gameCode}`);
+    gameListener = gameRef.on('value', snap => {
+        G = snap.val();
+        if (!G) { leaveGame(); return; }
+        render();
+    });
+}
+
+function leaveGame() {
+    if (gameRef) { gameRef.off('value', gameListener); gameRef = null; }
+    localStorage.removeItem('lms_code');
+    localStorage.removeItem('lms_role');
+    localStorage.removeItem('lms_pid');
+    gameCode = null; role = null; myPlayerId = null; G = null;
+    render();
+}
+
+// Host actions
+async function hostStartGame() {
+    if (players().length < 2) return;
+    await db.ref(`games/${gameCode}/status`).set('active');
+}
+
+async function hostRemovePlayer(pid) {
+    if (!confirm('Remove this player?')) return;
+    await db.ref(`games/${gameCode}/players/${pid}`).remove();
+}
+
+async function hostStartRound() {
+    const roundNum = rounds().length + 1;
+    const picks = {};
+    activePlayers().forEach(p => {
+        picks[p.id] = { playerId: p.id, team: null, result: null };
+    });
+    await db.ref(`games/${gameCode}/rounds/r${roundNum}`).set({
+        id: roundNum, status: 'picking', picks, winningTeams: {}
+    });
+}
+
+async function hostSetCloseTime(val) {
+    const round = currentRound();
+    if (!round) return;
+    const iso = val ? new Date(val).toISOString() : null;
+    await db.ref(`games/${gameCode}/rounds/r${round.id}/closeTime`).set(iso);
+}
+
+async function hostLockPicks() {
+    const round = currentRound();
+    const picks = Object.values(round.picks || {});
+
+    if (!picks.every(p => p.team)) {
+        alert('Not everyone has picked yet — wait for all picks before locking.');
+        return;
+    }
+
+    const teams = picks.map(p => p.team);
+    const dupes = teams.filter((t, i) => teams.indexOf(t) !== i);
+    if (dupes.length) {
+        alert(`Duplicate pick: ${[...new Set(dupes)].join(', ')}. Each player must pick a different team.`);
+        return;
+    }
+
+    const updates = {};
+    picks.forEach(pick => {
+        updates[`games/${gameCode}/players/${pick.playerId}/usedTeams/${pick.team}`] = true;
+    });
+    updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'results';
+    await db.ref().update(updates);
+}
+
+async function hostSubmitResults() {
+    const round = currentRound();
+    const picks = Object.values(round.picks || {});
+    const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+    const winSet = new Set(checked);
+
+    const updates = {};
+
+    picks.forEach(pick => {
+        const result = winSet.has(pick.team) ? 'win' : 'out';
+        updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/result`] = result;
+        if (result === 'out') {
+            updates[`games/${gameCode}/players/${pick.playerId}/active`] = false;
+            updates[`games/${gameCode}/players/${pick.playerId}/eliminatedRound`] = round.id;
+        }
+    });
+
+    checked.forEach(t => {
+        updates[`games/${gameCode}/rounds/r${round.id}/winningTeams/${t.replace(/\s+/g,'_')}`] = true;
+    });
+
+    updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'done';
+
+    // Determine survivors after this round
+    const survivors = players().filter(p => {
+        if (!p.active) return false;
+        const pick = picks.find(pk => pk.playerId === p.id);
+        return pick && winSet.has(pick.team);
+    });
+
+    if (survivors.length === 1) {
+        updates[`games/${gameCode}/status`] = 'complete';
+        updates[`games/${gameCode}/winner`] = survivors[0].id;
+    } else if (survivors.length === 0) {
+        updates[`games/${gameCode}/status`] = 'complete';
+        updates[`games/${gameCode}/winner`] = null;
+    }
+
+    await db.ref().update(updates);
+}
+
+// Player action
+async function playerSetPick(team) {
+    const round = currentRound();
+    if (!round || round.status !== 'picking' || !team) return;
+    // Show confirmation immediately, then write to Firebase
+    lastConfirmedTeam = team;
+    playerSubView = 'confirmation';
+    render();
+    await db.ref(`games/${gameCode}/rounds/r${round.id}/picks/${myPlayerId}/team`).set(team);
+}
+
+async function confirmReset() {
+    if (!confirm('Delete this game and start fresh? Everything will be gone.')) return;
+    await db.ref(`games/${gameCode}`).remove();
+    leaveGame();
+}
+
+function confirmLeave() {
+    if (!confirm('Leave this game?')) return;
+    leaveGame();
+}
+
+// ── RENDER ───────────────────────────────────────────────────────────────────
+
+function render() {
+    updateHeader();
+
+    if (!gameCode || !G) { renderHome(); return; }
+
+    const round = currentRound();
+
+    if (role === 'host') {
+        renderHost(round);
+    } else {
+        renderPlayer(round);
+    }
+}
+
+function updateHeader() {
+    const el = document.getElementById('headerRight');
+    if (gameCode && G) {
+        const label = role === 'host' ? 'Host' : esc(getPlayer(myPlayerId)?.name || '');
+        el.innerHTML = `
+            <div style="text-align:right">
+                <div class="badge">${esc(gameCode)}</div>
+                <div style="font-size:11px;opacity:0.65;margin-top:4px">${label}</div>
+            </div>`;
+    } else {
+        el.innerHTML = '';
+    }
+}
+
+function showLoading() {
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            <div class="card loading-wrap">
+                <div class="spin">⚽</div>
+                <p style="color:var(--grey)">Loading...</p>
+            </div>
+        </div>`;
+}
+
+// ── HOME ─────────────────────────────────────────────────────────────────────
+
+function renderHome() {
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            <div class="card">
+                <div class="home-icon">⚽</div>
+                <h2 style="font-size:22px;text-align:center;margin-bottom:8px">Last Man Standing</h2>
+                <p class="help-text" style="text-align:center;margin-bottom:24px">
+                    Premier League survivor. One pick per week — don't pick the same team twice. Last one left wins.
+                </p>
+
+                <button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="createGame()">
+                    Create a Game (Host)
+                </button>
+                <button class="btn btn-outline btn-full" onclick="showJoinForm()">
+                    Join a Game
+                </button>
+
+                <div id="joinForm" style="display:none;margin-top:20px">
+                    <div class="divider"></div>
+                    <p class="section-label" style="margin-bottom:10px">Enter your details</p>
+                    <input type="text" id="joinCode" placeholder="Game code (e.g. AB3X)"
+                        style="margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;font-weight:700;text-align:center;font-size:18px"
+                        maxlength="4" oninput="this.value=this.value.toUpperCase()"
+                        onkeydown="if(event.key==='Enter')document.getElementById('joinName').focus()">
+                    <input type="text" id="joinName" placeholder="Your name"
+                        style="margin-bottom:12px"
+                        onkeydown="if(event.key==='Enter')doJoin()">
+                    <button class="btn btn-success btn-full" onclick="doJoin()">Join →</button>
+                </div>
+
+                <p class="error-msg" id="homeError"></p>
+            </div>
+        </div>`;
+
+    // Pre-fill from URL ?join=CODE
+    const urlCode = new URLSearchParams(window.location.search).get('join');
+    if (urlCode) {
+        showJoinForm();
+        const el = document.getElementById('joinCode');
+        if (el) el.value = urlCode.toUpperCase().slice(0, 4);
+    }
+}
+
+function showJoinForm() {
+    const f = document.getElementById('joinForm');
+    if (f) { f.style.display = 'block'; document.getElementById('joinCode').focus(); }
+}
+
+function showHomeError(msg) {
+    render(); // re-render home to reset loading state
+    setTimeout(() => {
+        const el = document.getElementById('homeError');
+        if (el) { el.textContent = msg; el.style.display = 'block'; }
+    }, 50);
+}
+
+async function doJoin() {
+    const code = document.getElementById('joinCode')?.value || '';
+    const name = document.getElementById('joinName')?.value || '';
+    await joinGame(code, name);
+}
+
+function copyShareLink() {
+    const url = `${location.origin}${location.pathname}?join=${gameCode}`;
+    navigator.clipboard.writeText(url).then(() => alert('Link copied! Share it with your players.'));
+}
+
+// ── HOST VIEWS ───────────────────────────────────────────────────────────────
+
+function renderHost(round) {
+    if (G.status === 'setup')    { renderHostSetup(); return; }
+    if (G.status === 'complete') { renderComplete();  return; }
+    if (!round)                  { renderHostNewRound(); return; }
+
+    if (round.status === 'picking') renderHostPicking(round);
+    else if (round.status === 'results') renderHostResults(round);
+    else if (round.status === 'done')    renderHostRoundDone(round);
+}
+
+function renderHostSetup() {
+    const ps = players();
+    const listHtml = ps.length
+        ? ps.map(p => `
+            <div class="player-row">
+                <span class="player-name">${esc(p.name)}</span>
+                <button class="remove-btn" onclick="hostRemovePlayer('${p.id}')">✕</button>
+            </div>`).join('')
+        : '<div class="empty-state">No players yet — share the code below.</div>';
+
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                <div class="card">
+                    <div class="phase-label">Setup — Host</div>
+                    <h2>Share this code with your players</h2>
+                    <p class="help-text">Players open this page on their phones, tap "Join a Game", and enter the code.</p>
+
+                    <div class="code-display">${esc(gameCode)}</div>
+                    <p class="code-hint">Or share the direct link:</p>
+                    <button class="share-btn" onclick="copyShareLink()">📋 Copy join link</button>
+
+                    <div class="section-label">Players joined (${ps.length})</div>
+                    ${listHtml}
+
+                    ${ps.length >= 2 ? `
+                        <div class="divider"></div>
+                        <button class="btn btn-success btn-full" onclick="hostStartGame()">
+                            Start Game with ${ps.length} Players →
+                        </button>` : `
+                        <p style="font-size:13px;color:var(--grey);text-align:center;margin-top:16px">
+                            Need at least 2 players to start.
+                        </p>`}
+
+                    <div class="divider"></div>
+                    <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Cancel &amp; Delete Game</button>
+                </div>
+            </div>
+            <div>${renderStandings()}</div>
+        </div>`;
+}
+
+function renderHostNewRound() {
+    const num = rounds().length + 1;
+    const count = activePlayers().length;
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                <div class="card">
+                    <div class="phase-label">Ready for Round ${num}</div>
+                    <h2>${count} player${count !== 1 ? 's' : ''} still in</h2>
+                    <p class="help-text">
+                        When everyone's ready, start the round. Players will see the pick screen on their phones straight away.
+                    </p>
+                    <button class="btn btn-primary btn-full" onclick="hostStartRound()">
+                        Start Round ${num} →
+                    </button>
+                    <div class="divider"></div>
+                    <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Reset &amp; New Game</button>
+                </div>
+            </div>
+            <div>${renderStandings()}${renderHistory()}</div>
+        </div>`;
+}
+
+function renderHostPicking(round) {
+    const picks = Object.values(round.picks || {});
+    const allPicked = picks.every(p => p.team);
+    const pickedCount = picks.filter(p => p.team).length;
+
+    const rows = picks.map(pick => {
+        const p = getPlayer(pick.playerId);
+        const pill = pick.team
+            ? `<span class="status-pill pill-in">✓ ${esc(pick.team)}</span>`
+            : `<span class="status-pill pill-waiting">Picking...</span>`;
+        return `<div class="player-row">
+            <span class="player-name">${esc(p?.name || pick.playerId)}</span>
+            ${pill}
+        </div>`;
+    }).join('');
+
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                <div class="card">
+                    <div class="phase-label">Round ${round.id} — Picks</div>
+                    <h2>Waiting for picks (${pickedCount} / ${picks.length})</h2>
+                    <p class="help-text">Players are picking on their phones. Once everyone's chosen, lock them in.</p>
+                    ${rows}
+                    <div class="divider"></div>
+                    <button class="btn btn-primary btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
+                        Lock All Picks →
+                    </button>
+                    ${!allPicked ? `<p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">Waiting for all players.</p>` : ''}
+                    <div class="divider"></div>
+                    <div class="section-label" style="margin-bottom:6px">Pick deadline (optional)</div>
+                    <p style="font-size:12px;color:var(--grey);margin-bottom:8px">Set a time so players see a countdown on their phones.</p>
+                    <input type="datetime-local" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px"
+                        value="${round.closeTime ? formatDatetimeLocal(round.closeTime) : ''}"
+                        onchange="hostSetCloseTime(this.value)">
+                </div>
+            </div>
+            <div>${renderStandings()}</div>
+        </div>`;
+}
+
+function renderHostResults(round) {
+    const picks = Object.values(round.picks || {});
+    const pickedTeams = [...new Set(picks.map(p => p.team))].sort();
+
+    const rows = pickedTeams.map(team => {
+        const who = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
+        const safeId = team.replace(/\s+/g, '_');
+        return `
+            <div class="result-row" onclick="document.getElementById('cb_${safeId}').click()">
+                <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
+                    onclick="event.stopPropagation()">
+                <label for="cb_${safeId}">
+                    ${esc(team)}
+                    <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
+                </label>
+                <span style="font-size:12px;color:var(--grey)">won ✓</span>
+            </div>`;
+    }).join('');
+
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                <div class="card">
+                    <div class="phase-label">Round ${round.id} — Results</div>
+                    <h2>Which teams won?</h2>
+                    <p class="help-text">
+                        Tick every team that won this weekend. A draw counts as a loss.
+                        Unticked teams eliminate their player.
+                    </p>
+                    ${rows}
+                    <div class="divider"></div>
+                    <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
+                        Submit Results &amp; Eliminate →
+                    </button>
+                </div>
+            </div>
+            <div>${renderStandings()}</div>
+        </div>`;
+}
+
+function renderHostRoundDone(round) {
+    const picks = Object.values(round.picks || {});
+    const survived  = picks.filter(p => p.result === 'win');
+    const eliminated = picks.filter(p => p.result === 'out');
+
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                <div class="card">
+                    <div class="phase-label">Round ${round.id} — Complete</div>
+                    <h2>Round Summary</h2>
+
+                    ${survived.length ? `
+                        <div class="summary-box box-green">
+                            <h3>✅ Still in (${survived.length})</h3>
+                            <ul>${survived.map(p => `<li><strong>${esc(getPlayer(p.playerId)?.name)}</strong> — ${esc(p.team)}</li>`).join('')}</ul>
+                        </div>` : ''}
+
+                    ${eliminated.length ? `
+                        <div class="summary-box box-red">
+                            <h3>❌ Eliminated (${eliminated.length})</h3>
+                            <ul>${eliminated.map(p => `<li><strong>${esc(getPlayer(p.playerId)?.name)}</strong> — ${esc(p.team)} didn't win</li>`).join('')}</ul>
+                        </div>` : ''}
+
+                    <div class="divider"></div>
+                    <button class="btn btn-primary btn-full" onclick="hostStartRound()">
+                        Start Round ${round.id + 1} →
+                    </button>
+                </div>
+            </div>
+            <div>${renderStandings()}${renderHistory()}</div>
+        </div>`;
+}
+
+// ── PLAYER VIEWS ─────────────────────────────────────────────────────────────
+
+function renderPlayer(round) {
+    // Reset sub-views when round is no longer open for picking
+    if (playerSubView === 'confirmation' && round?.status !== 'picking') {
+        playerSubView = 'main';
+    }
+
+    if (G.status === 'setup')    { renderPlayerLobby(); return; }
+    if (G.status === 'complete') { renderComplete();    return; }
+
+    const myPlayer = getPlayer(myPlayerId);
+    if (!myPlayer?.active) { renderPlayerEliminated(); return; }
+
+    // Sub-view overrides
+    if (playerSubView === 'confirmation' && lastConfirmedTeam) { renderPlayerConfirmation(round); return; }
+    if (playerSubView === 'history')                           { renderPlayerPickHistory();       return; }
+
+    if (!round)                      { renderPlayerWaiting('Waiting for the host to start the next round...'); return; }
+    if (round.status === 'picking')  { renderPlayerPicking(round); return; }
+    if (round.status === 'results')  { renderPlayerWaiting('Results are being entered by the host. Hang tight...'); return; }
+    if (round.status === 'done')     { renderPlayerRoundDone(round); return; }
+}
+
+function renderPlayerLobby() {
+    const ps = players();
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            <div class="card">
+                <div class="phase-label">Lobby — Game ${esc(gameCode)}</div>
+                <h2>You're in!</h2>
+                <p class="help-text">Waiting for the host to start the game.</p>
+                ${ps.map(p => `
+                    <div class="player-row">
+                        <span class="player-name">${esc(p.name)}</span>
+                        ${p.id === myPlayerId ? '<span class="status-pill pill-in">You</span>' : ''}
+                    </div>`).join('')}
+                <div class="divider"></div>
+                <button class="btn btn-outline btn-full btn-sm" onclick="confirmLeave()">Leave Game</button>
+            </div>
+            ${renderMyPickHistoryBtn()}
+        </div>`;
+}
+
+function renderPlayerPicking(round) {
+    const myPick = (round.picks || {})[myPlayerId];
+    if (!myPick) { renderPlayerWaiting('Round in progress...'); return; }
+
+    const myPlayer  = getPlayer(myPlayerId);
+    const usedTeams = myPlayer?.usedTeams || {};
+
+    // Feature 4 — all 20 teams; used ones greyed out, available ones tappable
+    const teamGrid = ALL_TEAMS.map(t => {
+        const isUsed     = !!usedTeams[t];
+        const isSelected = myPick.team === t;
+        if (isUsed) {
+            return `<button class="team-btn team-used" disabled title="Already used">${esc(t)}</button>`;
+        }
+        return `<button class="team-btn${isSelected ? ' team-selected' : ''}"
+            data-team="${esc(t)}" onclick="playerSetPick(this.dataset.team)">${esc(t)}</button>`;
+    }).join('');
+
+    // Feature 2 — countdown if admin set a close time
+    const countdownHtml = round.closeTime ? `
+        <div class="countdown-box">
+            <div class="cd-label">Picks close in</div>
+            <div class="cd-time" id="countdownDisplay">—</div>
+        </div>` : '';
+
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderSurvivalBanner()}
+            <div class="card">
+                <div class="phase-label">Round ${round.id} — Your Pick</div>
+                <h2>Choose your team</h2>
+                ${countdownHtml}
+                <p class="help-text" style="margin-bottom:12px">
+                    Tap a team to pick it. Greyed-out teams have already been used this season.
+                    Your pick saves immediately — you can change it until the host locks picks.
+                </p>
+                <div class="team-grid">${teamGrid}</div>
+                ${myPick.team ? `
+                    <div class="picked-confirm">
+                        ✅ Current pick: <strong>${esc(myPick.team)}</strong>
+                    </div>` : ''}
+            </div>
+            ${renderMyPickHistoryBtn()}
+            ${renderStandings()}
+        </div>`;
+
+    if (round.closeTime) startCountdown(round.closeTime);
+}
+
+function renderPlayerWaiting(msg) {
+    const round = currentRound();
+    // Feature 2 — show countdown even on waiting screen if round has a close time and is still open
+    const countdownHtml = (round?.closeTime && round.status === 'picking') ? `
+        <div class="countdown-box" style="margin-bottom:16px">
+            <div class="cd-label">Picks close in</div>
+            <div class="cd-time" id="countdownDisplay">—</div>
+        </div>` : '';
+
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderSurvivalBanner()}
+            <div class="card" style="text-align:center;padding:32px 20px">
+                ${countdownHtml}
+                <div style="font-size:32px;margin-bottom:12px">⏳</div>
+                <p style="color:var(--grey);line-height:1.6">${esc(msg)}</p>
+            </div>
+            ${renderMyPickHistoryBtn()}
+            ${renderStandings()}
+        </div>`;
+
+    if (round?.closeTime && round.status === 'picking') startCountdown(round.closeTime);
+}
+
+function renderPlayerEliminated() {
+    // Feature 6 — survival banner shows elimination details
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderSurvivalBanner()}
+            <div class="card" style="text-align:center;padding:28px 20px">
+                <div style="font-size:36px;margin-bottom:10px">😬</div>
+                <p style="color:var(--grey);font-size:14px;line-height:1.6">You can still watch the rest of the game below.</p>
+            </div>
+            ${renderMyPickHistoryBtn()}
+            ${renderStandings()}${renderHistory()}
+        </div>`;
+}
+
+function renderPlayerRoundDone(round) {
+    const myPick   = (round.picks || {})[myPlayerId];
+    const survived = myPick?.result === 'win';
+
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderSurvivalBanner()}
+            <div class="card">
+                <div class="phase-label">Round ${round.id} — Done</div>
+                <h2>${survived ? '✅ You survived!' : "❌ You're out"}</h2>
+                <p class="help-text" style="margin-bottom:0">
+                    ${survived
+                        ? `${esc(myPick?.team)} won. Waiting for the host to start round ${round.id + 1}.`
+                        : `${esc(myPick?.team)} didn't win this weekend.`}
+                </p>
+            </div>
+            ${renderRoundPickReveal(round)}
+            ${renderMyPickHistoryBtn()}
+            ${renderStandings()}${renderHistory()}
+        </div>`;
+}
+
+// ── Feature 1 — Confirmation screen ──────────────────────────────────────────
+
+function renderPlayerConfirmation(round) {
+    const myPlayer = getPlayer(myPlayerId);
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            <div class="card pick-confirmation">
+                <div style="font-size:48px;margin-bottom:6px">✅</div>
+                <div style="font-size:12px;color:var(--grey);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Round ${round?.id || ''} — Pick confirmed</div>
+                <div class="conf-team">${esc(lastConfirmedTeam)}</div>
+                <div class="conf-meta">
+                    <strong>${esc(myPlayer?.name || '')}</strong><br>
+                    Pick saved. You can change it until the host locks picks.
+                </div>
+                <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
+            </div>
+        </div>`;
+}
+
+// ── Feature 3 — Personal pick history ────────────────────────────────────────
+
+function renderPlayerPickHistory() {
+    const myPlayer = getPlayer(myPlayerId);
+    const done = rounds().filter(r => r.status === 'done');
+
+    const rows = done.length ? done.map(round => {
+        const pick = (round.picks || {})[myPlayerId];
+        if (!pick) return '';
+        let pill = '';
+        if (pick.result === 'win')      pill = '<span class="status-pill pill-in">✓ Survived</span>';
+        else if (pick.result === 'out') pill = '<span class="status-pill pill-out">✕ Eliminated</span>';
+        return `<div class="reveal-row">
+            <span style="font-weight:600">Round ${round.id}</span>
+            <span class="reveal-team">${esc(pick.team || '—')}</span>
+            ${pill}
+        </div>`;
+    }).join('') : '<div class="empty-state">No completed rounds yet.</div>';
+
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            <div class="card">
+                <div class="phase-label">Pick History</div>
+                <h2>${esc(myPlayer?.name || 'Your picks')}</h2>
+                <div style="margin-top:12px">${rows}</div>
+            </div>
+            <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
+        </div>`;
+}
+
+// ── COMPLETE ─────────────────────────────────────────────────────────────────
+
+function renderComplete() {
+    const winner = G.winner ? getPlayer(G.winner) : null;
+    const isHost = role === 'host';
+
+    document.getElementById('app').innerHTML = `
+        <div class="layout">
+            <div>
+                ${winner ? `
+                    <div class="winner-banner">
+                        <div class="trophy">🏆</div>
+                        <div class="winner-label">Last Man Standing</div>
+                        <div class="winner-name">${esc(winner.name)}</div>
+                        <div class="rounds-survived">Survived all ${rounds().length} rounds</div>
+                    </div>` : `
+                    <div class="card" style="margin-bottom:20px">
+                        <h2>🤝 Everyone went out in Round ${rounds().length}!</h2>
+                        <p class="help-text" style="margin-bottom:0">All remaining players were eliminated in the same round — no winner this time.</p>
+                    </div>`}
+
+                <div class="card">
+                    ${isHost
+                        ? `<button class="btn btn-outline btn-full" onclick="confirmReset()">Start a New Game</button>`
+                        : `<button class="btn btn-outline btn-full" onclick="confirmLeave()">Leave Game</button>`}
+                </div>
+            </div>
+            <div>${renderStandings()}${renderHistory()}</div>
+        </div>`;
+}
+
+// ── STANDINGS ─────────────────────────────────────────────────────────────────
+
+function renderStandings() {
+    if (!G) return '';
+    const ps = players();
+    const inPs  = activePlayers().filter(p => p.id !== G.winner);
+    const outPs = ps.filter(p => !p.active).sort((a, b) => (b.eliminatedRound || 0) - (a.eliminatedRound || 0));
+
+    let html = '<div class="card"><h2>Standings</h2>';
+
+    if (!ps.length) return html + '<div class="empty-state">No players yet.</div></div>';
+
+    if (G.winner) {
+        const w = getPlayer(G.winner);
+        html += `<div class="player-row">
+            <span class="player-name">${esc(w?.name)}</span>
+            <span class="status-pill pill-winner">🏆 Winner</span>
+        </div>`;
+    }
+
+    inPs.forEach(p => {
+        const isMe = p.id === myPlayerId;
+        html += `<div class="player-row">
+            <span class="player-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;color:var(--grey);font-weight:400">(you)</span>' : ''}</span>
+            <span class="status-pill pill-in">In</span>
+        </div>`;
+    });
+
+    if (outPs.length) {
+        html += `<div class="divider"></div><div class="section-label">Eliminated</div>`;
+        outPs.forEach(p => {
+            html += `<div class="player-row">
+                <span class="player-name elim-name">${esc(p.name)}</span>
+                <span class="status-pill pill-out">Rd ${p.eliminatedRound}</span>
+            </div>`;
+        });
+    }
+
+    return html + '</div>';
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+
+function renderHistory() {
+    if (!G) return '';
+    const done = rounds().filter(r => r.status === 'done');
+    if (!done.length) return '<div class="card"><h2>Pick History</h2><div class="empty-state">No rounds completed yet.</div></div>';
+
+    const ps = players();
+    const rows = ps.map(p => {
+        const cells = done.map(round => {
+            const pick = (round.picks || {})[p.id];
+            if (!pick) return '<td style="color:#ccc">—</td>';
+            const cls  = pick.result === 'win' ? 'pick-win' : 'pick-out';
+            const icon = pick.result === 'win' ? '✓' : '✕';
+            return `<td class="${cls}">${esc(pick.team)} ${icon}</td>`;
+        }).join('');
+        return `<tr><td style="font-weight:600">${esc(p.name)}</td>${cells}</tr>`;
+    }).join('');
+
+    const headers = done.map(r => `<th>Rd ${r.id}</th>`).join('');
+
+    return `
+        <div class="card">
+            <h2>Pick History</h2>
+            <div class="history-wrap">
+                <table>
+                    <thead><tr><th>Player</th>${headers}</tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        </div>`;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+if (gameCode && role) {
+    listenToGame();
+} else {
+    render();
+}
+</script>
+</body>
+</html>
