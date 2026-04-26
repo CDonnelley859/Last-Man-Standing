@@ -534,6 +534,52 @@
         .btn-xs-danger   { background: #fee2e2; color: #991b1b; }
         .btn-xs-success  { background: #d1fae5; color: #065f46; }
         .btn-xs:hover { opacity: 0.8; }
+
+        /* ── Phase 3 styles ─────────────────────────────────────────── */
+
+        .feed-entry { border-bottom: 1px solid var(--border); padding: 12px 0; }
+        .feed-entry:last-child { border-bottom: none; }
+        .feed-round-header {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--purple);
+            margin-bottom: 8px;
+        }
+        .feed-elim   { font-size: 13px; color: #991b1b; margin-bottom: 3px; }
+        .feed-survive { font-size: 13px; color: #065f46; margin-bottom: 3px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .stat-item {
+            background: var(--light);
+            border-radius: 8px;
+            padding: 12px 10px;
+        }
+        .stat-label { font-size: 11px; color: var(--grey); margin-bottom: 4px; font-weight: 600; }
+        .stat-value { font-size: 14px; font-weight: 700; color: var(--purple); line-height: 1.3; }
+        .stat-sub   { font-size: 11px; color: var(--grey); margin-top: 2px; }
+
+        .copy-result-btn {
+            display: block;
+            width: 100%;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #065f46;
+            cursor: pointer;
+            text-align: center;
+            margin-top: 14px;
+        }
+        .copy-result-btn:hover { background: #dcfce7; }
     </style>
 </head>
 <body>
@@ -1156,7 +1202,7 @@ function renderHostNewRound() {
                 </div>
                 ${renderAdminPlayerManagement()}
             </div>
-            <div>${renderStandings()}${renderHistory()}</div>
+            <div>${renderStandings()}${renderHistory()}${renderResultsFeed()}</div>
         </div>`;
 }
 
@@ -1209,7 +1255,7 @@ function renderHostPicking(round) {
                         onchange="hostSetCloseTime(this.value)">
                 </div>
             </div>
-            <div>${renderStandings()}</div>
+            <div>${renderStandings()}${renderResultsFeed()}</div>
         </div>`;
 }
 
@@ -1252,7 +1298,7 @@ function renderHostResults(round) {
                     </button>
                 </div>
             </div>
-            <div>${renderStandings()}</div>
+            <div>${renderStandings()}${renderResultsFeed()}</div>
         </div>`;
 }
 
@@ -1288,7 +1334,7 @@ function renderHostRoundDone(round) {
                 </div>
                 ${renderAdminPlayerManagement()}
             </div>
-            <div>${renderStandings()}${renderHistory()}</div>
+            <div>${renderStandings()}${renderHistory()}${renderResultsFeed()}</div>
         </div>`;
 }
 
@@ -1309,6 +1355,8 @@ function renderPlayer(round) {
     // Sub-view overrides
     if (playerSubView === 'confirmation' && lastConfirmedTeam) { renderPlayerConfirmation(round); return; }
     if (playerSubView === 'history')                           { renderPlayerPickHistory();       return; }
+    if (playerSubView === 'allpicks')                          { renderPlayerAllPicks();          return; }
+    if (playerSubView === 'feed')                              { renderPlayerFeed();              return; }
 
     if (!round)                      { renderPlayerWaiting('Waiting for the host to start the next round...'); return; }
     if (round.status === 'picking')  { renderPlayerPicking(round); return; }
@@ -1379,6 +1427,7 @@ function renderPlayerPicking(round) {
                     </div>` : ''}
             </div>
             ${renderMyPickHistoryBtn()}
+            ${renderPhase3Nav()}
             ${renderStandings()}
         </div>`;
 
@@ -1403,6 +1452,7 @@ function renderPlayerWaiting(msg) {
                 <p style="color:var(--grey);line-height:1.6">${esc(msg)}</p>
             </div>
             ${renderMyPickHistoryBtn()}
+            ${renderPhase3Nav()}
             ${renderStandings()}
         </div>`;
 
@@ -1419,6 +1469,7 @@ function renderPlayerEliminated() {
                 <p style="color:var(--grey);font-size:14px;line-height:1.6">You can still watch the rest of the game below.</p>
             </div>
             ${renderMyPickHistoryBtn()}
+            ${renderPhase3Nav()}
             ${renderStandings()}${renderHistory()}
         </div>`;
 }
@@ -1433,14 +1484,16 @@ function renderPlayerRoundDone(round) {
             <div class="card">
                 <div class="phase-label">Round ${round.id} — Done</div>
                 <h2>${survived ? '✅ You survived!' : "❌ You're out"}</h2>
-                <p class="help-text" style="margin-bottom:0">
+                <p class="help-text" style="margin-bottom:${myPick ? '0' : '0'}">
                     ${survived
                         ? `${esc(myPick?.team)} won. Waiting for the host to start round ${round.id + 1}.`
                         : `${esc(myPick?.team)} didn't win this weekend.`}
                 </p>
+                ${myPick ? `<button class="copy-result-btn" onclick="copyRoundResult(${round.id})">📋 Copy result to share</button>` : ''}
             </div>
             ${renderRoundPickReveal(round)}
             ${renderMyPickHistoryBtn()}
+            ${renderPhase3Nav()}
             ${renderStandings()}${renderHistory()}
         </div>`;
 }
@@ -1515,13 +1568,14 @@ function renderComplete() {
                         <p class="help-text" style="margin-bottom:0">All remaining players were eliminated in the same round — no winner this time.</p>
                     </div>`}
 
+                ${renderSeasonStats()}
                 <div class="card">
                     ${isHost
                         ? `<button class="btn btn-outline btn-full" onclick="confirmReset()">Start a New Game</button>`
                         : `<button class="btn btn-outline btn-full" onclick="confirmLeave()">Leave Game</button>`}
                 </div>
             </div>
-            <div>${renderStandings()}${renderHistory()}</div>
+            <div>${renderStandings()}${renderHistory()}${renderResultsFeed()}</div>
         </div>`;
 }
 
@@ -1545,11 +1599,13 @@ function renderStandings() {
         </div>`;
     }
 
+    const doneRounds = rounds().filter(r => r.status === 'done');
     inPs.forEach(p => {
+        const survCount = doneRounds.filter(r => (r.picks||{})[p.id]?.result === 'win').length;
         const isMe = p.id === myPlayerId;
         html += `<div class="player-row">
             <span class="player-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;color:var(--grey);font-weight:400">(you)</span>' : ''}</span>
-            <span class="status-pill pill-in">In</span>
+            <span class="status-pill pill-in">${survCount > 0 ? survCount + (survCount === 1 ? ' round' : ' rounds') : 'In'}</span>
         </div>`;
     });
 
@@ -1597,6 +1653,138 @@ function renderHistory() {
                 </table>
             </div>
         </div>`;
+}
+
+// ── PHASE 3: RESULTS FEED ────────────────────────────────────────────────────
+
+function renderResultsFeed() {
+    if (!G) return '';
+    const done = rounds().filter(r => r.status === 'done').slice().reverse();
+    if (!done.length) return '';
+
+    const entries = done.map(round => {
+        const picks     = Object.values(round.picks || {});
+        const eliminated = picks.filter(p => p.result === 'out');
+        const survivors  = picks.filter(p => p.result === 'win');
+
+        const elimHtml = eliminated.length
+            ? eliminated.map(p => `<div class="feed-elim">❌ ${esc(getPlayer(p.playerId)?.name || '?')} — ${esc(p.team)}</div>`).join('')
+            : `<div style="color:var(--grey);font-size:12px">No eliminations this round.</div>`;
+
+        const survHtml = survivors.map(p =>
+            `<div class="feed-survive">✅ ${esc(getPlayer(p.playerId)?.name || '?')} — ${esc(p.team)}</div>`
+        ).join('');
+
+        return `<div class="feed-entry">
+            <div class="feed-round-header">Round ${round.id}</div>
+            ${elimHtml}
+            ${survHtml}
+        </div>`;
+    }).join('');
+
+    return `<div class="card"><h2>Results Feed</h2>
+        <p class="help-text" style="margin-bottom:12px">Most recent round first.</p>
+        ${entries}
+    </div>`;
+}
+
+function renderPlayerFeed() {
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderResultsFeed() || '<div class="card"><div class="empty-state">No completed rounds yet.</div></div>'}
+            <button class="btn btn-outline btn-full" onclick="playerSubView=\'main\';render()">← Back</button>
+        </div>`;
+}
+
+// ── PHASE 3: ALL PICKS SCREEN ─────────────────────────────────────────────────
+
+function renderPlayerAllPicks() {
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderHistory()}
+            <button class="btn btn-outline btn-full" onclick="playerSubView=\'main\';render()">← Back</button>
+        </div>`;
+}
+
+// ── PHASE 3: SEASON STATS ─────────────────────────────────────────────────────
+
+function renderSeasonStats() {
+    const ps   = players();
+    const done = rounds().filter(r => r.status === 'done');
+    if (!done.length && !G.winner) return '';
+
+    const winner = G.winner ? getPlayer(G.winner) : null;
+
+    const eliminated = ps.filter(p => !p.active && p.eliminatedRound);
+    const earliest   = eliminated.slice().sort((a, b) => a.eliminatedRound - b.eliminatedRound)[0];
+
+    let longestStreak = null;
+    if (winner) {
+        longestStreak = { name: winner.name, rounds: done.length };
+    } else if (eliminated.length) {
+        const latest = eliminated.slice().sort((a, b) => b.eliminatedRound - a.eliminatedRound)[0];
+        longestStreak = { name: latest.name, rounds: (latest.eliminatedRound || 1) - 1 };
+    }
+
+    const elimCounts = {};
+    done.forEach(round => {
+        Object.values(round.picks || {}).forEach(pick => {
+            if (pick.result === 'out' && pick.team) {
+                elimCounts[pick.team] = (elimCounts[pick.team] || 0) + 1;
+            }
+        });
+    });
+    const killerEntry = Object.entries(elimCounts).sort((a, b) => b[1] - a[1])[0];
+
+    return `<div class="card" style="margin-bottom:20px">
+        <h2>Season Stats</h2>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-label">🏆 Winner</div>
+                <div class="stat-value">${winner ? esc(winner.name) : 'No winner'}</div>
+            </div>
+            ${earliest ? `<div class="stat-item">
+                <div class="stat-label">💀 First Out</div>
+                <div class="stat-value">${esc(earliest.name)}</div>
+                <div class="stat-sub">Round ${earliest.eliminatedRound}</div>
+            </div>` : ''}
+            ${longestStreak && longestStreak.rounds > 0 ? `<div class="stat-item">
+                <div class="stat-label">🔥 Longest Run</div>
+                <div class="stat-value">${esc(longestStreak.name)}</div>
+                <div class="stat-sub">${longestStreak.rounds} round${longestStreak.rounds !== 1 ? 's' : ''}</div>
+            </div>` : ''}
+            ${killerEntry ? `<div class="stat-item">
+                <div class="stat-label">☠️ Killer Team</div>
+                <div class="stat-value">${esc(killerEntry[0])}</div>
+                <div class="stat-sub">Eliminated ${killerEntry[1]} player${killerEntry[1] !== 1 ? 's' : ''}</div>
+            </div>` : ''}
+        </div>
+    </div>`;
+}
+
+// ── PHASE 3: SHARE CARD ───────────────────────────────────────────────────────
+
+function copyRoundResult(roundId) {
+    const round = rounds().find(r => r.id === roundId);
+    if (!round) return;
+    const myPick  = (round.picks || {})[myPlayerId];
+    const survived = myPick?.result === 'win';
+    const active   = activePlayers().length;
+    const text = survived
+        ? `✅ I survived Round ${roundId} of Last Man Standing! ${active} player${active !== 1 ? 's' : ''} still in. 🏆`
+        : `❌ I went out in Round ${roundId} of Last Man Standing. ${active} player${active !== 1 ? 's' : ''} still standing.`;
+    navigator.clipboard.writeText(text).then(() => alert('Copied! Share it wherever you like.'));
+}
+
+// ── PHASE 3: PLAYER NAV ───────────────────────────────────────────────────────
+
+function renderPhase3Nav() {
+    const done = rounds().filter(r => r.status === 'done');
+    if (!done.length) return '';
+    return `<div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='allpicks';render()">📊 All Picks Grid</button>
+        <button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='feed';render()">📰 Results Feed</button>
+    </div>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
