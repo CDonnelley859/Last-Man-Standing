@@ -473,6 +473,67 @@
             .team-btn { font-size: 11px; padding: 8px 4px; }
             .code-display { font-size: 36px; letter-spacing: 6px; }
         }
+
+        /* ── Phase 2 Admin styles ───────────────────────────── */
+        .round-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+        .round-status.open   { background: #d1fae5; color: #065f46; }
+        .round-status.closed { background: #fee2e2; color: #991b1b; }
+        .round-status .dot   { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+        .picks-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .picks-row:last-child { border-bottom: none; }
+        .picks-row .pr-name  { flex: 1; font-weight: 600; font-size: 14px; }
+        .picks-row .pr-pick  { font-size: 13px; color: var(--grey); }
+        .picks-row.unpicked  { background: #fffbeb; margin: 0 -24px; padding: 10px 24px; }
+
+        .elim-preview {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+
+        .override-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .override-row:last-child { border-bottom: none; }
+        .override-row .or-name { flex: 1; font-weight: 600; font-size: 13px; }
+        .btn-xs {
+            padding: 5px 10px;
+            font-size: 12px;
+            min-height: 30px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+        }
+        .btn-xs-danger   { background: #fee2e2; color: #991b1b; }
+        .btn-xs-success  { background: #d1fae5; color: #065f46; }
+        .btn-xs:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -954,6 +1015,74 @@ function copyShareLink() {
     navigator.clipboard.writeText(url).then(() => alert('Link copied! Share it with your players.'));
 }
 
+// ── Phase 2 admin functions ───────────────────────────────────────────────────
+
+// Feature 4 — Reminder link
+function copyReminderLink() {
+    const round = currentRound();
+    const url = `${location.origin}${location.pathname}?join=${gameCode}`;
+    const msg = `⚽ Last Man Standing — Round ${round?.id || '?'} is open and you haven't picked yet!\n\nPick your team here: ${url}`;
+    navigator.clipboard.writeText(msg).then(() => alert('Reminder message copied! Paste it into WhatsApp or text.'));
+}
+
+// Feature 5 — Manual override
+async function adminReinstate(pid) {
+    const p = getPlayer(pid);
+    if (!confirm(`Reinstate ${p?.name}? They'll be marked as active again from the next round.`)) return;
+    await db.ref().update({
+        [`games/${gameCode}/players/${pid}/active`]: true,
+        [`games/${gameCode}/players/${pid}/eliminatedRound`]: null
+    });
+}
+
+async function adminEliminate(pid) {
+    const p = getPlayer(pid);
+    if (!confirm(`Manually eliminate ${p?.name}? You can reinstate them later if needed.`)) return;
+    const round = currentRound();
+    await db.ref().update({
+        [`games/${gameCode}/players/${pid}/active`]: false,
+        [`games/${gameCode}/players/${pid}/eliminatedRound`]: round?.id || 0
+    });
+}
+
+function renderAdminPlayerManagement() {
+    const ps = players();
+    if (!ps.length) return '';
+    const rows = ps.map(p => `
+        <div class="override-row">
+            <span class="or-name">${esc(p.name)}</span>
+            <span class="status-pill ${p.active ? 'pill-in' : 'pill-out'}" style="font-size:10px">${p.active ? 'In' : `Rd ${p.eliminatedRound}`}</span>
+            ${p.active
+                ? `<button class="btn-xs btn-xs-danger" onclick="adminEliminate('${p.id}')">Eliminate</button>`
+                : `<button class="btn-xs btn-xs-success" onclick="adminReinstate('${p.id}')">Reinstate</button>`}
+        </div>`).join('');
+    return `<div class="card">
+        <h2>Player Management</h2>
+        <p class="help-text">Manually override any player's status. Confirmation required for each change.</p>
+        ${rows}
+    </div>`;
+}
+
+// Feature 3 — Live elimination preview on results screen
+function updateEliminationPreview() {
+    const round = currentRound();
+    if (!round) return;
+    const picks = Object.values(round.picks || {});
+    const checked = Array.from(document.querySelectorAll('input[type=checkbox]:checked')).map(c => c.value);
+    const winSet = new Set(checked);
+    const el = document.getElementById('elimPreview');
+    if (!el) return;
+    if (!checked.length) {
+        el.innerHTML = '<p style="color:var(--grey)">Tick the teams that won to see who survives.</p>';
+        return;
+    }
+    const survive  = picks.filter(p => p.team && winSet.has(p.team)).map(p => esc(getPlayer(p.playerId)?.name)).filter(Boolean);
+    const elim     = picks.filter(p => p.team && !winSet.has(p.team)).map(p => esc(getPlayer(p.playerId)?.name)).filter(Boolean);
+    el.innerHTML = `
+        ${survive.length ? `<div style="color:#065f46;margin-bottom:4px">✅ Survive: <strong>${survive.join(', ')}</strong></div>` : ''}
+        ${elim.length    ? `<div style="color:#991b1b">❌ Eliminated: <strong>${elim.join(', ')}</strong></div>` : ''}`;
+}
+
 // ── HOST VIEWS ───────────────────────────────────────────────────────────────
 
 function renderHost(round) {
@@ -1009,41 +1138,43 @@ function renderHostSetup() {
 }
 
 function renderHostNewRound() {
-    const num = rounds().length + 1;
+    const num   = rounds().length + 1;
     const count = activePlayers().length;
     document.getElementById('app').innerHTML = `
         <div class="layout">
             <div>
                 <div class="card">
-                    <div class="phase-label">Ready for Round ${num}</div>
-                    <h2>${count} player${count !== 1 ? 's' : ''} still in</h2>
-                    <p class="help-text">
-                        When everyone's ready, start the round. Players will see the pick screen on their phones straight away.
-                    </p>
-                    <button class="btn btn-primary btn-full" onclick="hostStartRound()">
-                        Start Round ${num} →
+                    <div class="phase-label">Admin — Round Control</div>
+                    <h2>Ready for Round ${num}</h2>
+                    <div class="round-status closed"><div class="dot"></div> No round open</div>
+                    <p class="help-text">${count} player${count !== 1 ? 's' : ''} still in. Opening the round lets players pick their team immediately.</p>
+                    <button class="btn btn-success btn-full" onclick="hostStartRound()">
+                        🟢 Open Round ${num}
                     </button>
                     <div class="divider"></div>
                     <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Reset &amp; New Game</button>
                 </div>
+                ${renderAdminPlayerManagement()}
             </div>
             <div>${renderStandings()}${renderHistory()}</div>
         </div>`;
 }
 
 function renderHostPicking(round) {
-    const picks = Object.values(round.picks || {});
-    const allPicked = picks.every(p => p.team);
+    const picks      = Object.values(round.picks || {});
+    const allPicked  = picks.every(p => p.team);
     const pickedCount = picks.filter(p => p.team).length;
+    const unpicked   = picks.filter(p => !p.team);
 
+    // Feature 1 — picks dashboard rows, unpicked highlighted
     const rows = picks.map(pick => {
-        const p = getPlayer(pick.playerId);
-        const pill = pick.team
-            ? `<span class="status-pill pill-in">✓ ${esc(pick.team)}</span>`
-            : `<span class="status-pill pill-waiting">Picking...</span>`;
-        return `<div class="player-row">
-            <span class="player-name">${esc(p?.name || pick.playerId)}</span>
-            ${pill}
+        const p      = getPlayer(pick.playerId);
+        const hasPick = !!pick.team;
+        return `<div class="picks-row${hasPick ? '' : ' unpicked'}">
+            <span class="pr-name">${esc(p?.name || pick.playerId)}</span>
+            ${hasPick
+                ? `<span class="pr-pick">${esc(pick.team)}</span><span class="status-pill pill-in" style="font-size:10px">✓ Picked</span>`
+                : `<span class="pr-pick" style="color:#d97706">Not picked yet</span><span class="status-pill pill-waiting" style="font-size:10px">Waiting</span>`}
         </div>`;
     }).join('');
 
@@ -1051,15 +1182,25 @@ function renderHostPicking(round) {
         <div class="layout">
             <div>
                 <div class="card">
-                    <div class="phase-label">Round ${round.id} — Picks</div>
-                    <h2>Waiting for picks (${pickedCount} / ${picks.length})</h2>
-                    <p class="help-text">Players are picking on their phones. Once everyone's chosen, lock them in.</p>
+                    <div class="phase-label">Admin — Round Control</div>
+                    <h2>Round ${round.id} — Picks Dashboard</h2>
+                    <div class="round-status open"><div class="dot"></div> Round open</div>
+
+                    <div class="section-label" style="margin-bottom:8px">Picks received (${pickedCount} / ${picks.length})</div>
                     ${rows}
+
+                    ${unpicked.length ? `
+                        <div class="divider"></div>
+                        <button class="btn btn-outline btn-full btn-sm" onclick="copyReminderLink()">
+                            📲 Copy reminder link (${unpicked.length} haven't picked)
+                        </button>` : ''}
+
                     <div class="divider"></div>
-                    <button class="btn btn-primary btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
-                        Lock All Picks →
+                    <button class="btn btn-danger btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
+                        🔴 Close Round &amp; Lock Picks
                     </button>
-                    ${!allPicked ? `<p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">Waiting for all players.</p>` : ''}
+                    ${!allPicked ? `<p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">${unpicked.length} player${unpicked.length !== 1 ? 's' : ''} still to pick.</p>` : ''}
+
                     <div class="divider"></div>
                     <div class="section-label" style="margin-bottom:6px">Pick deadline (optional)</div>
                     <p style="font-size:12px;color:var(--grey);margin-bottom:8px">Set a time so players see a countdown on their phones.</p>
@@ -1077,12 +1218,12 @@ function renderHostResults(round) {
     const pickedTeams = [...new Set(picks.map(p => p.team))].sort();
 
     const rows = pickedTeams.map(team => {
-        const who = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
+        const who    = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
         const safeId = team.replace(/\s+/g, '_');
         return `
-            <div class="result-row" onclick="document.getElementById('cb_${safeId}').click()">
+            <div class="result-row" onclick="document.getElementById('cb_${safeId}').click();updateEliminationPreview()">
                 <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
-                    onclick="event.stopPropagation()">
+                    onclick="event.stopPropagation()" onchange="updateEliminationPreview()">
                 <label for="cb_${safeId}">
                     ${esc(team)}
                     <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
@@ -1098,11 +1239,14 @@ function renderHostResults(round) {
                     <div class="phase-label">Round ${round.id} — Results</div>
                     <h2>Which teams won?</h2>
                     <p class="help-text">
-                        Tick every team that won this weekend. A draw counts as a loss.
-                        Unticked teams eliminate their player.
+                        Tick every team that won this weekend. Draws and losses = eliminated.
+                        Unticked teams eliminate that player.
                     </p>
                     ${rows}
                     <div class="divider"></div>
+                    <div class="elim-preview" id="elimPreview">
+                        <p style="color:var(--grey)">Tick the teams that won to see who survives.</p>
+                    </div>
                     <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
                         Submit Results &amp; Eliminate →
                     </button>
@@ -1113,7 +1257,7 @@ function renderHostResults(round) {
 }
 
 function renderHostRoundDone(round) {
-    const picks = Object.values(round.picks || {});
+    const picks    = Object.values(round.picks || {});
     const survived  = picks.filter(p => p.result === 'win');
     const eliminated = picks.filter(p => p.result === 'out');
 
@@ -1121,8 +1265,9 @@ function renderHostRoundDone(round) {
         <div class="layout">
             <div>
                 <div class="card">
-                    <div class="phase-label">Round ${round.id} — Complete</div>
-                    <h2>Round Summary</h2>
+                    <div class="phase-label">Admin — Round Control</div>
+                    <h2>Round ${round.id} — Complete</h2>
+                    <div class="round-status closed"><div class="dot"></div> Round closed</div>
 
                     ${survived.length ? `
                         <div class="summary-box box-green">
@@ -1132,15 +1277,16 @@ function renderHostRoundDone(round) {
 
                     ${eliminated.length ? `
                         <div class="summary-box box-red">
-                            <h3>❌ Eliminated (${eliminated.length})</h3>
+                            <h3>❌ Auto-eliminated (${eliminated.length})</h3>
                             <ul>${eliminated.map(p => `<li><strong>${esc(getPlayer(p.playerId)?.name)}</strong> — ${esc(p.team)} didn't win</li>`).join('')}</ul>
                         </div>` : ''}
 
                     <div class="divider"></div>
-                    <button class="btn btn-primary btn-full" onclick="hostStartRound()">
-                        Start Round ${round.id + 1} →
+                    <button class="btn btn-success btn-full" onclick="hostStartRound()">
+                        🟢 Open Round ${round.id + 1}
                     </button>
                 </div>
+                ${renderAdminPlayerManagement()}
             </div>
             <div>${renderStandings()}${renderHistory()}</div>
         </div>`;
