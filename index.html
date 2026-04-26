@@ -580,6 +580,52 @@
             margin-top: 14px;
         }
         .copy-result-btn:hover { background: #dcfce7; }
+
+        /* ── Multi-game styles ──────────────────────────────────────── */
+        .saved-game-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 11px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .saved-game-row:last-child { border-bottom: none; }
+        .saved-game-info { flex: 1; }
+        .saved-game-name { font-weight: 700; font-size: 14px; }
+        .saved-game-meta { font-size: 12px; color: var(--grey); margin-top: 2px; }
+
+        .host-player-banner {
+            background: #fef3c7;
+            border: 1px solid #fde68a;
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #92400e;
+            font-weight: 600;
+        }
+
+        .tab-row {
+            display: flex;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            margin-bottom: 18px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 9px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            background: white;
+            border: none;
+            cursor: pointer;
+            color: var(--grey);
+        }
+        .tab-btn.tab-active { background: var(--purple); color: white; }
+        .tab-btn:hover:not(.tab-active) { background: var(--light); }
     </style>
 </head>
 <body>
@@ -618,18 +664,44 @@ const ALL_TEAMS = [
     "Nottm Forest","Southampton","Tottenham","West Ham","Wolves"
 ];
 
+// ── LOCALSTORAGE HELPERS ──────────────────────────────────────────────────────
+function savedGames() {
+    try { return JSON.parse(localStorage.getItem('lms_games') || '[]'); } catch { return []; }
+}
+function saveGame(code, rle, pid, name, gameName) {
+    const games = savedGames().filter(g => g.code !== code);
+    games.push({ code, role: rle, pid, name, gameName: gameName || code });
+    localStorage.setItem('lms_games', JSON.stringify(games));
+}
+function removeGame(code) {
+    localStorage.setItem('lms_games', JSON.stringify(savedGames().filter(g => g.code !== code)));
+}
+function migrateLegacyLocalStorage() {
+    const oldCode = localStorage.getItem('lms_code');
+    const oldRole = localStorage.getItem('lms_role');
+    const oldPid  = localStorage.getItem('lms_pid');
+    if (oldCode && oldRole) {
+        if (!localStorage.getItem('lms_games')) saveGame(oldCode, oldRole, oldPid || null, 'Player', oldCode);
+        localStorage.removeItem('lms_code');
+        localStorage.removeItem('lms_role');
+        localStorage.removeItem('lms_pid');
+    }
+}
+
 // ── SESSION STATE ────────────────────────────────────────────────────────────
-let gameCode     = localStorage.getItem('lms_code');
-let role         = localStorage.getItem('lms_role');   // 'host' | 'player'
-let myPlayerId   = localStorage.getItem('lms_pid');
+let gameCode     = null;
+let role         = null;   // 'host' | 'player'
+let myPlayerId   = null;
+let myName       = null;
 let G            = null;   // live game snapshot from Firebase
 let gameRef      = null;
 let gameListener = null;
 
 // Sub-view state (local only, not Firebase)
-let playerSubView    = 'main'; // 'main' | 'confirmation' | 'history'
+let playerSubView     = 'main'; // 'main' | 'confirmation' | 'history' | 'allpicks' | 'feed'
 let lastConfirmedTeam = null;
 let countdownTimer    = null;
+let hostView          = 'admin'; // 'admin' | 'player' — host toggling to player view
 
 // ── UTILITIES ────────────────────────────────────────────────────────────────
 function esc(s) {
@@ -760,7 +832,7 @@ function renderRoundPickReveal(round) {
 
 // ── FIREBASE ACTIONS ─────────────────────────────────────────────────────────
 
-async function createGame() {
+async function createGame(hostName, gameName) {
     showLoading();
     let code;
     for (let i = 0; i < 10; i++) {
@@ -769,18 +841,20 @@ async function createGame() {
         if (!snap.exists()) break;
     }
 
+    const gName = gameName || 'Last Man Standing';
     await db.ref(`games/${code}`).set({
         status: 'setup',
+        gameName: gName,
         winner: null,
-        nextId: 1,
-        players: {},
+        nextId: 2,
+        players: {
+            p1: { id: 'p1', name: hostName, active: true, usedTeams: {}, eliminatedRound: null }
+        },
         rounds: {}
     });
 
-    localStorage.setItem('lms_code', code);
-    localStorage.setItem('lms_role', 'host');
-    localStorage.removeItem('lms_pid');
-    gameCode = code; role = 'host'; myPlayerId = null;
+    gameCode = code; role = 'host'; myPlayerId = 'p1'; myName = hostName; hostView = 'admin';
+    saveGame(code, 'host', 'p1', hostName, gName);
     listenToGame();
 }
 
@@ -810,10 +884,8 @@ async function joinGame(code, name) {
     });
     await db.ref(`games/${code}/nextId`).set(nextId + 1);
 
-    localStorage.setItem('lms_code', code);
-    localStorage.setItem('lms_role', 'player');
-    localStorage.setItem('lms_pid', pid);
-    gameCode = code; role = 'player'; myPlayerId = pid;
+    gameCode = code; role = 'player'; myPlayerId = pid; myName = name; hostView = 'admin';
+    saveGame(code, 'player', pid, name, game.gameName || code);
     listenToGame();
 }
 
@@ -822,18 +894,30 @@ function listenToGame() {
     gameRef = db.ref(`games/${gameCode}`);
     gameListener = gameRef.on('value', snap => {
         G = snap.val();
-        if (!G) { leaveGame(); return; }
+        if (!G) { returnToHome(); return; }
         render();
     });
 }
 
-function leaveGame() {
+function returnToHome() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
     if (gameRef) { gameRef.off('value', gameListener); gameRef = null; }
-    localStorage.removeItem('lms_code');
-    localStorage.removeItem('lms_role');
-    localStorage.removeItem('lms_pid');
-    gameCode = null; role = null; myPlayerId = null; G = null;
+    gameCode = null; role = null; myPlayerId = null; myName = null; G = null;
+    playerSubView = 'main'; lastConfirmedTeam = null; hostView = 'admin';
     render();
+}
+
+async function leaveGamePermanently() {
+    if (role === 'host') {
+        alert("You're the host — you can't leave your own game. Use 'Reset & Delete Game' in the admin panel.");
+        return;
+    }
+    if (!confirm("Leave this game? You'll be removed permanently.")) return;
+    const code = gameCode;
+    const pid  = myPlayerId;
+    returnToHome();
+    removeGame(code);
+    if (pid) await db.ref(`games/${code}/players/${pid}`).remove();
 }
 
 // Host actions
@@ -843,6 +927,7 @@ async function hostStartGame() {
 }
 
 async function hostRemovePlayer(pid) {
+    if (pid === myPlayerId) return;
     if (!confirm('Remove this player?')) return;
     await db.ref(`games/${gameCode}/players/${pid}`).remove();
 }
@@ -943,13 +1028,14 @@ async function playerSetPick(team) {
 
 async function confirmReset() {
     if (!confirm('Delete this game and start fresh? Everything will be gone.')) return;
-    await db.ref(`games/${gameCode}`).remove();
-    leaveGame();
+    const code = gameCode;
+    returnToHome();
+    removeGame(code);
+    await db.ref(`games/${code}`).remove();
 }
 
 function confirmLeave() {
-    if (!confirm('Leave this game?')) return;
-    leaveGame();
+    leaveGamePermanently();
 }
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
@@ -961,7 +1047,7 @@ function render() {
 
     const round = currentRound();
 
-    if (role === 'host') {
+    if (role === 'host' && hostView === 'admin') {
         renderHost(round);
     } else {
         renderPlayer(round);
@@ -971,11 +1057,14 @@ function render() {
 function updateHeader() {
     const el = document.getElementById('headerRight');
     if (gameCode && G) {
-        const label = role === 'host' ? 'Host' : esc(getPlayer(myPlayerId)?.name || '');
+        const viewLabel = role === 'host'
+            ? (hostView === 'player' ? '⚽ My Picks' : '👔 Host')
+            : esc(getPlayer(myPlayerId)?.name || myName || '');
         el.innerHTML = `
             <div style="text-align:right">
                 <div class="badge">${esc(gameCode)}</div>
-                <div style="font-size:11px;opacity:0.65;margin-top:4px">${label}</div>
+                <div style="font-size:11px;opacity:0.65;margin-top:4px">${viewLabel}</div>
+                <div style="font-size:10px;opacity:0.5;margin-top:3px;cursor:pointer;text-decoration:underline" onclick="returnToHome()">← All Games</div>
             </div>`;
     } else {
         el.innerHTML = '';
@@ -995,6 +1084,20 @@ function showLoading() {
 // ── HOME ─────────────────────────────────────────────────────────────────────
 
 function renderHome() {
+    const games = savedGames();
+    const savedHtml = games.length ? `
+        <div class="card">
+            <div class="section-label" style="margin-bottom:12px">Your games</div>
+            ${games.map(g => `
+                <div class="saved-game-row">
+                    <div class="saved-game-info">
+                        <div class="saved-game-name">${esc(g.gameName || g.code)}</div>
+                        <div class="saved-game-meta">${esc(g.code)} · ${g.role === 'host' ? '👔 Host' : esc(g.name)}</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="continueGame('${esc(g.code)}')">Continue →</button>
+                </div>`).join('')}
+        </div>` : '';
+
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             <div class="card">
@@ -1004,12 +1107,22 @@ function renderHome() {
                     Premier League survivor. One pick per week — don't pick the same team twice. Last one left wins.
                 </p>
 
-                <button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="createGame()">
-                    Create a Game (Host)
+                <button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="showHostForm()">
+                    Host a Game
                 </button>
                 <button class="btn btn-outline btn-full" onclick="showJoinForm()">
                     Join a Game
                 </button>
+
+                <div id="hostForm" style="display:none;margin-top:20px">
+                    <div class="divider"></div>
+                    <p class="section-label" style="margin-bottom:10px">Set up your game</p>
+                    <input type="text" id="hostName" placeholder="Your name" style="margin-bottom:10px"
+                        onkeydown="if(event.key==='Enter')document.getElementById('hostGameName').focus()">
+                    <input type="text" id="hostGameName" placeholder="Game name (optional, e.g. Office League)"
+                        style="margin-bottom:12px" onkeydown="if(event.key==='Enter')doCreateGame()">
+                    <button class="btn btn-primary btn-full" onclick="doCreateGame()">Create Game →</button>
+                </div>
 
                 <div id="joinForm" style="display:none;margin-top:20px">
                     <div class="divider"></div>
@@ -1026,6 +1139,7 @@ function renderHome() {
 
                 <p class="error-msg" id="homeError"></p>
             </div>
+            ${savedHtml}
         </div>`;
 
     // Pre-fill from URL ?join=CODE
@@ -1037,23 +1151,81 @@ function renderHome() {
     }
 }
 
+function showHostForm() {
+    const j = document.getElementById('joinForm'); if (j) j.style.display = 'none';
+    const f = document.getElementById('hostForm');
+    if (f) { f.style.display = 'block'; document.getElementById('hostName').focus(); }
+}
+
 function showJoinForm() {
+    const h = document.getElementById('hostForm'); if (h) h.style.display = 'none';
     const f = document.getElementById('joinForm');
     if (f) { f.style.display = 'block'; document.getElementById('joinCode').focus(); }
 }
 
 function showHomeError(msg) {
-    render(); // re-render home to reset loading state
+    render();
     setTimeout(() => {
         const el = document.getElementById('homeError');
         if (el) { el.textContent = msg; el.style.display = 'block'; }
     }, 50);
 }
 
+async function doCreateGame() {
+    const name     = document.getElementById('hostName')?.value.trim();
+    const gameName = document.getElementById('hostGameName')?.value.trim();
+    if (!name) { showHomeError('Enter your name to create a game.'); return; }
+    await createGame(name, gameName);
+}
+
 async function doJoin() {
     const code = document.getElementById('joinCode')?.value || '';
     const name = document.getElementById('joinName')?.value || '';
     await joinGame(code, name);
+}
+
+async function continueGame(code) {
+    const saved = savedGames().find(g => g.code === code);
+    if (!saved) { render(); return; }
+    showLoading();
+    const snap = await db.ref(`games/${code}`).once('value');
+    if (!snap.exists()) {
+        removeGame(code);
+        render();
+        setTimeout(() => {
+            const el = document.getElementById('homeError');
+            if (el) { el.textContent = `Game ${code} no longer exists — it may have been deleted.`; el.style.display = 'block'; }
+        }, 50);
+        return;
+    }
+    const gameData = snap.val();
+    if (saved.pid && saved.role === 'player' && !(gameData.players || {})[saved.pid]) {
+        removeGame(code);
+        render();
+        setTimeout(() => {
+            const el = document.getElementById('homeError');
+            if (el) { el.textContent = `You were removed from game ${code}.`; el.style.display = 'block'; }
+        }, 50);
+        return;
+    }
+    gameCode = code; role = saved.role; myPlayerId = saved.pid; myName = saved.name;
+    hostView = 'admin'; playerSubView = 'main';
+    listenToGame();
+}
+
+function renderHostPlayerBanner() {
+    if (role !== 'host') return '';
+    return `<div class="host-player-banner">
+        <span>👔 Admin — viewing as player</span>
+        <button class="btn-xs btn-xs-danger" style="font-size:11px;padding:4px 10px;min-height:28px;border-radius:6px" onclick="hostView='admin';playerSubView='main';render()">← Admin Panel</button>
+    </div>`;
+}
+
+function renderAdminTab() {
+    return `<div class="tab-row">
+        <button class="tab-btn tab-active">👔 Admin Panel</button>
+        <button class="tab-btn" onclick="hostView='player';playerSubView='main';render()">⚽ My Picks</button>
+    </div>`;
 }
 
 function copyShareLink() {
@@ -1142,12 +1314,13 @@ function renderHost(round) {
 }
 
 function renderHostSetup() {
-    const ps = players();
+    const ps     = players();
+    const others = ps.filter(p => p.id !== myPlayerId);
     const listHtml = ps.length
         ? ps.map(p => `
             <div class="player-row">
-                <span class="player-name">${esc(p.name)}</span>
-                <button class="remove-btn" onclick="hostRemovePlayer('${p.id}')">✕</button>
+                <span class="player-name">${esc(p.name)}${p.id === myPlayerId ? ' <span class="status-pill pill-in" style="font-size:10px;margin-left:4px">You</span>' : ''}</span>
+                ${p.id !== myPlayerId ? `<button class="remove-btn" onclick="hostRemovePlayer('${p.id}')">✕</button>` : ''}
             </div>`).join('')
         : '<div class="empty-state">No players yet — share the code below.</div>';
 
@@ -1155,6 +1328,7 @@ function renderHostSetup() {
         <div class="layout">
             <div>
                 <div class="card">
+                    ${renderAdminTab()}
                     <div class="phase-label">Setup — Host</div>
                     <h2>Share this code with your players</h2>
                     <p class="help-text">Players open this page on their phones, tap "Join a Game", and enter the code.</p>
@@ -1166,13 +1340,13 @@ function renderHostSetup() {
                     <div class="section-label">Players joined (${ps.length})</div>
                     ${listHtml}
 
-                    ${ps.length >= 2 ? `
+                    ${others.length >= 1 ? `
                         <div class="divider"></div>
                         <button class="btn btn-success btn-full" onclick="hostStartGame()">
                             Start Game with ${ps.length} Players →
                         </button>` : `
                         <p style="font-size:13px;color:var(--grey);text-align:center;margin-top:16px">
-                            Need at least 2 players to start.
+                            Waiting for at least 1 more player to join.
                         </p>`}
 
                     <div class="divider"></div>
@@ -1190,6 +1364,7 @@ function renderHostNewRound() {
         <div class="layout">
             <div>
                 <div class="card">
+                    ${renderAdminTab()}
                     <div class="phase-label">Admin — Round Control</div>
                     <h2>Ready for Round ${num}</h2>
                     <div class="round-status closed"><div class="dot"></div> No round open</div>
@@ -1228,6 +1403,7 @@ function renderHostPicking(round) {
         <div class="layout">
             <div>
                 <div class="card">
+                    ${renderAdminTab()}
                     <div class="phase-label">Admin — Round Control</div>
                     <h2>Round ${round.id} — Picks Dashboard</h2>
                     <div class="round-status open"><div class="dot"></div> Round open</div>
@@ -1282,6 +1458,7 @@ function renderHostResults(round) {
         <div class="layout">
             <div>
                 <div class="card">
+                    ${renderAdminTab()}
                     <div class="phase-label">Round ${round.id} — Results</div>
                     <h2>Which teams won?</h2>
                     <p class="help-text">
@@ -1311,6 +1488,7 @@ function renderHostRoundDone(round) {
         <div class="layout">
             <div>
                 <div class="card">
+                    ${renderAdminTab()}
                     <div class="phase-label">Admin — Round Control</div>
                     <h2>Round ${round.id} — Complete</h2>
                     <div class="round-status closed"><div class="dot"></div> Round closed</div>
@@ -1368,8 +1546,9 @@ function renderPlayerLobby() {
     const ps = players();
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
+            ${renderHostPlayerBanner()}
             <div class="card">
-                <div class="phase-label">Lobby — Game ${esc(gameCode)}</div>
+                <div class="phase-label">Lobby — Game ${esc(G.gameName || gameCode)}</div>
                 <h2>You're in!</h2>
                 <p class="help-text">Waiting for the host to start the game.</p>
                 ${ps.map(p => `
@@ -1377,8 +1556,9 @@ function renderPlayerLobby() {
                         <span class="player-name">${esc(p.name)}</span>
                         ${p.id === myPlayerId ? '<span class="status-pill pill-in">You</span>' : ''}
                     </div>`).join('')}
-                <div class="divider"></div>
-                <button class="btn btn-outline btn-full btn-sm" onclick="confirmLeave()">Leave Game</button>
+                ${role !== 'host' ? `
+                    <div class="divider"></div>
+                    <button class="btn btn-outline btn-full btn-sm" onclick="leaveGamePermanently()">Leave Game</button>` : ''}
             </div>
             ${renderMyPickHistoryBtn()}
         </div>`;
@@ -1411,6 +1591,7 @@ function renderPlayerPicking(round) {
 
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
+            ${renderHostPlayerBanner()}
             ${renderSurvivalBanner()}
             <div class="card">
                 <div class="phase-label">Round ${round.id} — Your Pick</div>
@@ -1445,6 +1626,7 @@ function renderPlayerWaiting(msg) {
 
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
+            ${renderHostPlayerBanner()}
             ${renderSurvivalBanner()}
             <div class="card" style="text-align:center;padding:32px 20px">
                 ${countdownHtml}
@@ -1463,6 +1645,7 @@ function renderPlayerEliminated() {
     // Feature 6 — survival banner shows elimination details
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
+            ${renderHostPlayerBanner()}
             ${renderSurvivalBanner()}
             <div class="card" style="text-align:center;padding:28px 20px">
                 <div style="font-size:36px;margin-bottom:10px">😬</div>
@@ -1480,6 +1663,7 @@ function renderPlayerRoundDone(round) {
 
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
+            ${renderHostPlayerBanner()}
             ${renderSurvivalBanner()}
             <div class="card">
                 <div class="phase-label">Round ${round.id} — Done</div>
@@ -1788,11 +1972,8 @@ function renderPhase3Nav() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-if (gameCode && role) {
-    listenToGame();
-} else {
-    render();
-}
+migrateLegacyLocalStorage();
+render();
 </script>
 </body>
 </html>
