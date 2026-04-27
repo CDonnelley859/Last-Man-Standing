@@ -671,9 +671,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // ── FOOTBALL API ──────────────────────────────────────────────────────────────
-// Get your free API key at football-data.org
-const FOOTBALL_API_KEY = '07740c047e40400e9faebe27e75b11f5';
-const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
+// Calls are proxied through /api/football to avoid browser CORS restrictions
 
 // ── TEAMS ────────────────────────────────────────────────────────────────────
 const FALLBACK_TEAMS = [
@@ -973,14 +971,11 @@ async function leaveGamePermanently() {
 // ── LIVE DATA — API FUNCTIONS ─────────────────────────────────────────────────
 
 function apiConfigured() {
-    return FOOTBALL_API_KEY && FOOTBALL_API_KEY !== 'YOUR_KEY_HERE';
+    return true; // always available via server-side proxy
 }
 
 async function apiFetch(endpoint) {
-    if (!apiConfigured()) throw new Error('No API key configured');
-    const res = await fetch(`${FOOTBALL_API_BASE}${endpoint}`, {
-        headers: { 'X-Auth-Token': FOOTBALL_API_KEY }
-    });
+    const res = await fetch(`/api/football?endpoint=${encodeURIComponent(endpoint)}`);
     if (!res.ok) throw new Error(`API error ${res.status}`);
     return res.json();
 }
