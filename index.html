@@ -1591,6 +1591,7 @@ function render() {
 
 function updateHeader() {
     const el = document.getElementById('headerRight');
+    if (!el) return;
     if (gameCode && G) {
         const viewLabel = role === 'host'
             ? (hostView === 'player' ? '⚽ My Picks' : '👔 Host')
