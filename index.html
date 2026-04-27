@@ -234,6 +234,40 @@
         .box-blue  { background: #eff6ff; border: 1px solid #bfdbfe; }
         .box-blue h3 { color: #1e40af; }
 
+        /* ── Stats & Leaderboard page ─────────────────────────────── */
+        .stats-tabs { display:flex; gap:4px; background:#f3f4f6; border-radius:10px; padding:4px; margin-bottom:16px; }
+        .stats-tab-btn { flex:1; padding:8px 4px; border:none; background:transparent; border-radius:8px; font-size:12px; font-weight:700; color:var(--grey); cursor:pointer; letter-spacing:0.2px; }
+        .stats-tab-btn.tab-active { background:#fff; color:var(--purple); box-shadow:0 1px 3px rgba(0,0,0,.12); }
+
+        .lb-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .lb-table th { font-size:10px; color:var(--grey); font-weight:700; text-transform:uppercase; padding:6px 8px; border-bottom:2px solid var(--border); text-align:left; white-space:nowrap; letter-spacing:0.3px; }
+        .lb-table td { padding:10px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+        .lb-table tr:last-child td { border-bottom:none; }
+        .lb-table tr.lb-me td { background:#f5f3ff; }
+        .lb-rank { font-weight:700; color:var(--grey); width:32px; font-size:15px; }
+        .lb-name { font-weight:600; }
+        .lb-pts { font-weight:800; color:var(--purple); font-size:16px; }
+
+        .form-guide { display:flex; gap:3px; align-items:center; }
+        .form-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+        .form-dot.win { background:#10b981; }
+        .form-dot.out { background:#ef4444; }
+        .form-dot.empty { background:#e5e7eb; }
+
+        .stat-card-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .stat-card { background:#f9fafb; border:1px solid var(--border); border-radius:10px; padding:14px; }
+        .stat-card.full { grid-column:1/-1; }
+        .stat-card-label { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--grey); margin-bottom:6px; letter-spacing:0.4px; }
+        .stat-card-value { font-size:20px; font-weight:800; color:var(--purple); line-height:1.2; }
+        .stat-card-sub { font-size:12px; color:var(--grey); margin-top:3px; }
+
+        .team-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:12px; }
+        .team-bar-row:last-child { margin-bottom:0; }
+        .team-bar-name { width:110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; }
+        .team-bar-track { flex:1; height:7px; background:#e5e7eb; border-radius:4px; overflow:hidden; }
+        .team-bar-fill { height:100%; background:var(--purple); border-radius:4px; }
+        .team-bar-count { width:20px; text-align:right; color:var(--grey); font-weight:700; }
+
         .winner-banner {
             background: linear-gradient(135deg, #37003c, #7c3aed);
             color: white;
@@ -717,7 +751,8 @@ let gameRef      = null;
 let gameListener = null;
 
 // Sub-view state (local only, not Firebase)
-let playerSubView     = 'main'; // 'main' | 'confirmation' | 'history' | 'allpicks' | 'feed'
+let playerSubView     = 'main'; // 'main' | 'confirmation' | 'history' | 'allpicks' | 'feed' | 'stats'
+let statsTab          = 'leaderboard'; // 'leaderboard' | 'season' | 'history'
 let lastConfirmedTeam = null;
 let countdownTimer    = null;
 let hostView          = 'admin'; // 'admin' | 'player' — host toggling to player view
@@ -1910,6 +1945,9 @@ function renderPlayer(round) {
     if (G.status === 'setup')    { renderPlayerLobby(); return; }
     if (G.status === 'complete') { renderComplete();    return; }
 
+    // Stats is accessible to everyone regardless of active status
+    if (playerSubView === 'stats') { renderStatsPage(); return; }
+
     const myPlayer = getPlayer(myPlayerId);
     if (!myPlayer?.active) { renderPlayerEliminated(); return; }
 
@@ -2354,9 +2392,201 @@ function copyRoundResult(roundId) {
 function renderPhase3Nav() {
     const done = rounds().filter(r => r.status === 'done');
     if (!done.length) return '';
-    return `<div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='allpicks';render()">📊 All Picks Grid</button>
-        <button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='feed';render()">📰 Results Feed</button>
+    return `<button class="btn btn-outline btn-full btn-sm" onclick="playerSubView='stats';statsTab='leaderboard';render()">📊 Stats &amp; Leaderboard</button>`;
+}
+
+// ── STATS & LEADERBOARD PAGE ─────────────────────────────────────────────────
+
+function renderStatsPage() {
+    const tabs = [
+        ['leaderboard', '🏆 Leaderboard'],
+        ['season',      '📊 Season Stats'],
+        ['history',     '📋 Pick History'],
+    ];
+    const tabBar = tabs.map(([id, label]) =>
+        `<button class="stats-tab-btn${statsTab === id ? ' tab-active' : ''}" onclick="statsTab='${id}';render()">${label}</button>`
+    ).join('');
+
+    let content = '';
+    if (statsTab === 'leaderboard') content = renderLeaderboardTab();
+    else if (statsTab === 'season')  content = renderSeasonStatsTab();
+    else if (statsTab === 'history') content = renderPickHistoryTab();
+
+    document.getElementById('app').innerHTML = `
+        <div class="center-wrap">
+            ${renderHostPlayerBanner()}
+            <button class="btn btn-outline btn-full btn-sm" style="margin-bottom:12px" onclick="playerSubView='main';render()">← Back</button>
+            <div class="card" style="padding-bottom:12px">
+                <h2 style="margin-bottom:14px">Stats &amp; Leaderboard</h2>
+                <div class="stats-tabs">${tabBar}</div>
+            </div>
+            ${content}
+        </div>`;
+}
+
+function renderLeaderboardTab() {
+    const ps   = players();
+    const done = rounds().filter(r => r.status === 'done');
+
+    if (!ps.length) return '<div class="card"><div class="empty-state">No players yet.</div></div>';
+
+    const ranked = ps.map(p => {
+        const pts  = p.seasonPoints || 0;
+        const wins = p.cycleWins || 0;
+        const lastFive = done.slice(-5).map(r => {
+            const pick = (r.picks || {})[p.id];
+            if (!pick || !pick.result) return 'empty';
+            return pick.result === 'win' ? 'win' : 'out';
+        });
+        // Pad to 5 if fewer rounds played
+        while (lastFive.length < 5) lastFive.unshift('empty');
+        return { p, pts, wins, lastFive };
+    }).sort((a, b) => b.pts - a.pts || b.wins - a.wins || a.p.name.localeCompare(b.p.name));
+
+    const medal = ['🥇','🥈','🥉'];
+    const rows = ranked.map(({ p, pts, wins, lastFive }, i) => {
+        const isMe   = p.id === myPlayerId;
+        const rank   = medal[i] || `${i + 1}.`;
+        const status = p.active
+            ? `<span class="status-pill pill-in" style="font-size:10px">In</span>`
+            : `<span class="status-pill pill-out" style="font-size:10px">Out</span>`;
+        const form = lastFive.map(r => `<div class="form-dot ${r}"></div>`).join('');
+        return `<tr class="${isMe ? 'lb-me' : ''}">
+            <td class="lb-rank">${rank}</td>
+            <td class="lb-name">${esc(p.name)}${isMe ? '<br><span style="font-size:10px;font-weight:400;color:var(--grey)">(you)</span>' : ''}</td>
+            <td class="lb-pts">${pts}</td>
+            <td style="font-weight:700;color:#6b7280">${wins}</td>
+            <td><div class="form-guide">${form}</div></td>
+            <td>${status}</td>
+        </tr>`;
+    }).join('');
+
+    return `<div class="card" style="padding:0;overflow:hidden">
+        <table class="lb-table">
+            <thead><tr>
+                <th></th>
+                <th>Player</th>
+                <th>Pts</th>
+                <th>🏆</th>
+                <th>Last 5</th>
+                <th>Status</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>
+    <p class="help-text" style="text-align:center;margin-top:8px;font-size:11px">Form dots: green = survived, red = out. 🏆 = cycle wins.</p>`;
+}
+
+function renderSeasonStatsTab() {
+    const ps   = players();
+    const done = rounds().filter(r => r.status === 'done');
+
+    if (!done.length) return '<div class="card"><div class="empty-state">No rounds completed yet.</div></div>';
+
+    const sortedByPts  = ps.slice().sort((a, b) => (b.seasonPoints || 0) - (a.seasonPoints || 0));
+    const sortedByWins = ps.slice().sort((a, b) => (b.cycleWins || 0) - (a.cycleWins || 0));
+    const leader       = sortedByPts[0];
+    const mostWins     = sortedByWins[0];
+
+    const cyclesCompleted = done.filter(r => r.cycleWinner != null || r.cycleNoWinner).length;
+    const cycleStart      = G.cycleStartRound || 1;
+    const roundInCycle    = (done[done.length - 1]?.id || 0) - cycleStart + 1;
+
+    // Team stats across all completed rounds
+    const teamPicks = {}, teamWins = {}, teamElims = {};
+    done.forEach(r => {
+        Object.values(r.picks || {}).forEach(pick => {
+            if (!pick.team) return;
+            teamPicks[pick.team]  = (teamPicks[pick.team]  || 0) + 1;
+            if (pick.result === 'win') teamWins[pick.team]  = (teamWins[pick.team]  || 0) + 1;
+            if (pick.result === 'out') teamElims[pick.team] = (teamElims[pick.team] || 0) + 1;
+        });
+    });
+
+    const topPicked = Object.entries(teamPicks).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    const killer    = Object.entries(teamElims).sort((a, b) => b[1] - a[1])[0];
+    const reliable  = Object.entries(teamWins).sort((a, b) => b[1] - a[1])[0];
+    const maxPicks  = topPicked[0]?.[1] || 1;
+
+    return `
+        <div class="card">
+            <div class="stat-card-grid">
+                <div class="stat-card">
+                    <div class="stat-card-label">🏅 Current Leader</div>
+                    <div class="stat-card-value">${esc(leader?.name || '—')}</div>
+                    <div class="stat-card-sub">${leader?.seasonPoints || 0} pts this season</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">🔁 Most Cycle Wins</div>
+                    <div class="stat-card-value">${esc(mostWins?.name || '—')}</div>
+                    <div class="stat-card-sub">${mostWins?.cycleWins || 0} cycle${(mostWins?.cycleWins || 0) !== 1 ? 's' : ''} won</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">📅 Rounds Played</div>
+                    <div class="stat-card-value">${done.length}</div>
+                    <div class="stat-card-sub">${cyclesCompleted} cycle${cyclesCompleted !== 1 ? 's' : ''} completed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-label">⚡ Current Cycle</div>
+                    <div class="stat-card-value">Round ${Math.max(roundInCycle, 1)}</div>
+                    <div class="stat-card-sub">Started at round ${cycleStart}</div>
+                </div>
+                ${killer ? `<div class="stat-card">
+                    <div class="stat-card-label">☠️ Killer Team</div>
+                    <div class="stat-card-value">${esc(killer[0])}</div>
+                    <div class="stat-card-sub">${killer[1]} player${killer[1] !== 1 ? 's' : ''} knocked out</div>
+                </div>` : ''}
+                ${reliable ? `<div class="stat-card">
+                    <div class="stat-card-label">⭐ Most Reliable</div>
+                    <div class="stat-card-value">${esc(reliable[0])}</div>
+                    <div class="stat-card-sub">Won ${reliable[1]} time${reliable[1] !== 1 ? 's' : ''} when picked</div>
+                </div>` : ''}
+            </div>
+        </div>
+        ${topPicked.length ? `<div class="card">
+            <h2 style="margin-bottom:14px">Most Picked Teams</h2>
+            ${topPicked.map(([team, count]) => `
+                <div class="team-bar-row">
+                    <div class="team-bar-name">${esc(team)}</div>
+                    <div class="team-bar-track"><div class="team-bar-fill" style="width:${Math.round(count/maxPicks*100)}%"></div></div>
+                    <div class="team-bar-count">${count}</div>
+                </div>`).join('')}
+        </div>` : ''}`;
+}
+
+function renderPickHistoryTab() {
+    const done = rounds().filter(r => r.status === 'done');
+    if (!done.length) return '<div class="card"><div class="empty-state">No rounds completed yet.</div></div>';
+
+    const ps = players();
+    const rows = ps.map(p => {
+        const cells = done.map(r => {
+            const pick       = (r.picks || {})[p.id];
+            const cycleEnd   = r.cycleWinner != null || r.cycleNoWinner;
+            const borderStyle = cycleEnd ? 'border-right:2px solid var(--purple)' : '';
+            if (!pick || !pick.team) return `<td style="color:#ccc;${borderStyle}">—</td>`;
+            const cls  = pick.result === 'win' ? 'pick-win' : 'pick-out';
+            const icon = pick.result === 'win' ? '✓' : '✕';
+            const trophy = r.cycleWinner === p.id ? ' 🏆' : '';
+            return `<td class="${cls}" style="${borderStyle}">${esc(pick.team)} ${icon}${trophy}</td>`;
+        }).join('');
+        return `<tr><td style="font-weight:600;white-space:nowrap;padding-right:12px">${esc(p.name)}</td>${cells}</tr>`;
+    }).join('');
+
+    const headers = done.map(r => {
+        const cycleEnd = r.cycleWinner != null || r.cycleNoWinner;
+        return `<th style="${cycleEnd ? 'border-right:2px solid var(--purple)' : ''}">Rd ${r.id}</th>`;
+    }).join('');
+
+    return `<div class="card" style="overflow-x:auto">
+        <h2 style="margin-bottom:6px">Pick History</h2>
+        <p class="help-text" style="margin-bottom:12px;font-size:11px">Purple line = end of cycle &nbsp;·&nbsp; 🏆 = cycle winner</p>
+        <div class="history-wrap">
+            <table>
+                <thead><tr><th>Player</th>${headers}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>
     </div>`;
 }
 
