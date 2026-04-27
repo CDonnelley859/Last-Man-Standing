@@ -849,7 +849,7 @@ function renderRoundPickReveal(round) {
         else if (pick.result === 'out') pill = '<span class="status-pill pill-out">✕ Out</span>';
         return `<div class="reveal-row">
             <span style="font-weight:${isMe ? '700' : '500'}">${esc(p?.name || pick.playerId)}${isMe ? ' <span style="font-size:11px;font-weight:400;color:var(--grey)">(you)</span>' : ''}</span>
-            <span class="reveal-team">${esc(pick.team || '—')}</span>
+            <span class="reveal-team">${esc(pick.team || '—')}${pick.autoPicked ? ' <span style="font-size:10px;color:#d97706">(auto)</span>' : ''}</span>
             ${pill}
         </div>`;
     }).join('');
@@ -1137,11 +1137,31 @@ async function autoClosePicks() {
     autoCloseTimer = null;
     const round = currentRound();
     if (!round || round.status !== 'picking') return;
+
     const picks = Object.values(round.picks || {});
     const updates = {};
+
+    // Track teams already chosen this round so auto-picks don't clash
+    const takenThisRound = new Set(picks.filter(p => p.team).map(p => p.team));
+
+    // Auto-pick for anyone who didn't pick in time
+    picks.filter(p => !p.team).forEach(pick => {
+        const player      = getPlayer(pick.playerId);
+        const usedTeams   = player?.usedTeams || {};
+        const firstFree   = getTeams().find(t => !usedTeams[t] && !takenThisRound.has(t));
+        if (firstFree) {
+            updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/team`]      = firstFree;
+            updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/autoPicked`] = true;
+            updates[`games/${gameCode}/players/${pick.playerId}/usedTeams/${firstFree}`]       = true;
+            takenThisRound.add(firstFree);
+        }
+    });
+
+    // Mark manually chosen teams in usedTeams
     picks.filter(p => p.team).forEach(pick => {
         updates[`games/${gameCode}/players/${pick.playerId}/usedTeams/${pick.team}`] = true;
     });
+
     updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'results';
     await db.ref().update(updates);
     startResultsPolling();
@@ -1655,7 +1675,7 @@ function renderHostPicking(round) {
         return `<div class="picks-row${hasPick ? '' : ' unpicked'}">
             <span class="pr-name">${esc(p?.name || pick.playerId)}</span>
             ${hasPick
-                ? `<span class="pr-pick">${esc(pick.team)}</span><span class="status-pill pill-in" style="font-size:10px">✓ Picked</span>`
+                ? `<span class="pr-pick">${esc(pick.team)}${pick.autoPicked ? ' <span style="font-size:10px;color:#d97706">(auto)</span>' : ''}</span><span class="status-pill pill-in" style="font-size:10px">✓ Picked</span>`
                 : `<span class="pr-pick" style="color:#d97706">Not picked yet</span><span class="status-pill pill-waiting" style="font-size:10px">Waiting</span>`}
         </div>`;
     }).join('');
