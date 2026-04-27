@@ -1011,9 +1011,9 @@ async function fetchFixtures() {
         const matchday = comp.currentSeason.currentMatchday;
         const data = await apiFetch(`/competitions/PL/matches?matchday=${matchday}`);
         const matches = data.matches || [];
-        const kickoffs = matches
-            .filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
-            .map(m => m.utcDate).sort();
+        // Use ALL match times (not just upcoming) so firstKickoff is always
+        // the absolute first game of the gameweek — picks close before that.
+        const kickoffs = matches.map(m => m.utcDate).sort();
         cachedMatchday = { matchday, matches, firstKickoff: kickoffs[0] || null };
         liveDataError = null;
         return cachedMatchday;
