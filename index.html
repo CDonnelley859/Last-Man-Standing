@@ -1495,6 +1495,11 @@ function renderHostPlayerBanner() {
     </div>`;
 }
 
+function renderDeleteBtn() {
+    return `<div class="divider"></div>
+        <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">🗑 Delete Game</button>`;
+}
+
 function renderAdminTab() {
     return `<div class="tab-row">
         <button class="tab-btn tab-active">👔 Admin Panel</button>
@@ -1729,6 +1734,7 @@ function renderHostPicking(round) {
                         </button>` : ''}
                     ${manualControls}
                     ${matchesHtml}
+                    ${renderDeleteBtn()}
                 </div>
             </div>
             <div>${renderStandings()}${renderResultsFeed()}</div>
@@ -1803,6 +1809,7 @@ function renderHostResults(round) {
                     <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
                         Submit Results &amp; Eliminate →
                     </button>
+                    ${renderDeleteBtn()}
                 </div>
             </div>
             <div>${renderStandings()}${renderResultsFeed()}</div>
@@ -1842,6 +1849,7 @@ function renderHostRoundDone(round) {
                     <button class="btn btn-outline btn-full btn-sm" onclick="hostStartRound()">
                         🟢 Open Round ${round.id + 1} manually
                     </button>
+                    ${renderDeleteBtn()}
                 </div>
                 ${renderAdminPlayerManagement()}
             </div>
