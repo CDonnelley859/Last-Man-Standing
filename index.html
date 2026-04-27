@@ -697,17 +697,94 @@
         .match-finished { background: #d1fae5; color: #065f46; }
         .match-live { background: #fee2e2; color: #991b1b; }
         .match-upcoming { background: #f3f4f6; color: #6b7280; }
+
+        /* ═══ New design system ════════════════════════════════════════ */
+        header { display: none; }
+        .center-wrap { padding-top: 40px; padding-bottom: 96px; }
+
+        /* Hero titles */
+        .hero-head { margin-bottom: 24px; }
+        .hero-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; color: rgba(255,255,255,0.6); margin-bottom: 2px; }
+        .hero-title { font-size: 36px; font-weight: 900; color: white; letter-spacing: -0.02em; line-height: 1; }
+        .hero-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; }
+        .section-label-white { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: rgba(255,255,255,0.7); margin-bottom: 8px; }
+
+        /* Frosted glass inputs */
+        .glass-field { margin-bottom: 12px; }
+        .glass-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; color: rgba(255,255,255,0.75); margin-bottom: 6px; display: block; }
+        .glass-box { height: 50px; border-radius: 12px; background: rgba(255,255,255,0.14); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.22); box-shadow: inset 0 1px 3px rgba(0,0,0,0.08); overflow: hidden; }
+        .glass-box input[type="text"] { height: 100%; background: transparent; border: none; color: white; font-weight: 700; font-size: 15px; padding: 0 16px; font-family: inherit; width: 100%; }
+        .glass-box input::placeholder { color: rgba(255,255,255,0.38); font-weight: 400; font-size: 14px; }
+        .glass-box input:focus { outline: none; }
+
+        /* Join/Create toggle */
+        .glass-toggle { display: flex; gap: 6px; background: rgba(0,0,0,0.18); border-radius: 13px; padding: 4px; backdrop-filter: blur(8px); margin-bottom: 20px; }
+        .glass-toggle-btn { flex: 1; height: 36px; border-radius: 10px; border: none; cursor: pointer; font-family: inherit; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; transition: all 0.18s; }
+        .glass-toggle-btn.active { background: white; color: var(--dark); box-shadow: 0 2px 8px rgba(0,0,0,0.22); }
+        .glass-toggle-btn:not(.active) { background: transparent; color: rgba(255,255,255,0.65); }
+
+        /* CTA dark button */
+        .btn-cta { display: flex; align-items: center; justify-content: center; width: 100%; height: 52px; border-radius: 14px; border: none; cursor: pointer; background: linear-gradient(135deg,#1a1a1a,#111111); color: white; font-family: inherit; font-weight: 800; font-size: 14px; letter-spacing: 0.12em; box-shadow: 0 4px 20px rgba(0,0,0,0.4),0 1px 0 rgba(255,255,255,0.07) inset; }
+        .btn-cta:hover { opacity: 0.9; }
+
+        /* Teal code badge */
+        .code-badge { background: var(--teal); color: white; border-radius: 8px 8px 8px 2px; padding: 5px 10px; font-weight: 700; font-size: 9px; letter-spacing: 0.05em; box-shadow: 0 2px 6px rgba(28,191,160,0.45); white-space: nowrap; }
+
+        /* Saved game card */
+        .game-card { clip-path: polygon(0 0,100% 0,100% 100%,18px 100%,0 calc(100% - 18px)); background: white; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.14)); padding: 13px 16px 13px 20px; display: flex; align-items: center; justify-content: space-between; position: relative; }
+        .game-card-accent { position: absolute; left: 0; top: 0; width: 4px; bottom: 0; border-radius: 4px 0 0 0; }
+
+        /* Avatar circle */
+        .av { border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; color: white; flex-shrink: 0; }
+        .av-teal { background: radial-gradient(circle at 35% 35%,rgba(28,191,160,0.8),#1CBFA0); box-shadow: 0 2px 8px rgba(28,191,160,0.3); }
+        .av-dim { background: #9CA3AF; }
+
+        /* Leaderboard avatar card */
+        .lb-card { clip-path: polygon(0 0,100% 0,100% 100%,18px 100%,0 calc(100% - 18px)); background: white; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.12)) drop-shadow(0 1px 3px rgba(0,0,0,0.06)); padding: 10px 14px 10px 20px; display: flex; align-items: center; gap: 11px; position: relative; }
+        .lb-card::before { content: ''; position: absolute; left: 0; top: 0; width: 4px; bottom: 0; background: var(--lime); border-radius: 4px 0 0 0; }
+        .lb-card.lb-dim { background: #E5E7EB; filter: none; }
+        .lb-card.lb-dim::before { background: transparent; }
+        .lb-card.lb-me { box-shadow: 0 0 0 2px var(--lime) inset; }
+        .pick-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 7px; background: var(--lime); color: var(--dark); font-weight: 700; font-size: 9px; letter-spacing: 0.03em; }
+        .medal-badge { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 9px; color: var(--dark); flex-shrink: 0; }
+
+        /* Segment tabs */
+        .seg-tabs { display: flex; background: #0f9e83; border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 16px; }
+        .seg-tab-btn { flex: 1; height: 34px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; font-size: 11px; letter-spacing: 0.01em; transition: all 0.18s; }
+        .seg-tab-btn.tab-active { background: white; color: var(--teal); font-weight: 700; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .seg-tab-btn:not(.tab-active) { background: transparent; color: rgba(255,255,255,0.8); font-weight: 500; }
+
+        /* Bottom nav */
+        .bottom-nav { position: fixed; bottom: 16px; left: 16px; right: 16px; height: 64px; border-radius: 20px; background: linear-gradient(180deg,#1e1e1e 0%,#111 100%); box-shadow: 0 -1px 0 rgba(255,255,255,0.05),0 8px 32px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: space-around; padding: 0 4px; z-index: 100; }
+        .bnav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 48px; border-radius: 12px; cursor: pointer; gap: 2px; transition: background 0.2s; }
+        .bnav-item.bnav-active { background: var(--lime); }
+        .bnav-icon { font-size: 15px; line-height: 1; color: #6B7280; }
+        .bnav-label { font-size: 9px; font-weight: 400; line-height: 1; color: #6B7280; }
+        .bnav-item.bnav-active .bnav-icon,.bnav-item.bnav-active .bnav-label { color: var(--dark); font-weight: 700; }
+
+        /* Fixture pair picking */
+        .fixture-pair { clip-path: polygon(0 0,100% 0,100% 100%,18px 100%,0 calc(100% - 18px)); background: white; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.15)); position: relative; overflow: hidden; }
+        .fixture-inner { display: flex; align-items: center; padding: 10px 14px; gap: 6px; }
+        .fixture-sheen { position: absolute; inset: 0; background: linear-gradient(180deg,rgba(255,255,255,0.5) 0%,rgba(255,255,255,0) 38%); pointer-events: none; z-index: 1; }
+        .team-circle { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 13px; color: white; flex-shrink: 0; transition: box-shadow 0.15s; }
+        .team-side { display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; padding: 4px; border-radius: 8px; transition: background 0.12s; position: relative; z-index: 2; }
+        .team-side:hover { background: rgba(28,191,160,0.06); }
+        .t-away { justify-content: flex-end; }
+        .team-name-txt { font-weight: 800; font-size: 12px; color: var(--dark); line-height: 1.2; }
+        .t-away .team-name-txt { text-align: right; }
+        .vs-txt { font-size: 9px; color: #9CA3AF; font-weight: 600; flex-shrink: 0; padding: 0 2px; z-index: 2; position: relative; }
+        .team-side.team-used-side { cursor: not-allowed; opacity: 0.4; }
+
+        /* Pick hero */
+        .pick-hero { text-align: center; padding: 8px 0 20px; }
+        .pick-hero-label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; color: var(--lime); margin-bottom: 10px; }
+        .pick-hero-circle { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 24px; color: white; margin: 0 auto 10px; }
+        .pick-hero-name { font-size: 22px; font-weight: 800; color: white; letter-spacing: -0.01em; line-height: 1; }
+        .pick-hero-vs { display: inline-block; margin-top: 8px; background: rgba(200,240,106,0.18); color: var(--lime); border: 1px solid rgba(200,240,106,0.35); border-radius: 10px 10px 10px 4px; padding: 4px 14px; font-weight: 700; font-size: 10px; }
+        .fixture-section-label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; color: rgba(255,255,255,0.5); margin-bottom: 8px; }
     </style>
 </head>
 <body>
-
-<header>
-    <div>
-        <h1>⚽ Last Man Standing</h1>
-        <div class="subtitle">Premier League Survivor</div>
-    </div>
-    <div id="headerRight"></div>
-</header>
 
 <div id="app"></div>
 
@@ -737,6 +814,102 @@ const FALLBACK_TEAMS = [
     "Leeds United","Liverpool","Man City","Man United","Newcastle",
     "Nottm Forest","Sunderland","Tottenham","West Ham","Wolves"
 ];
+
+const TEAM_COLORS = {
+    'Arsenal':                { color:'#EF4444', abbr:'ARS' },
+    'Arsenal FC':             { color:'#EF4444', abbr:'ARS' },
+    'Aston Villa':            { color:'#7C3AED', abbr:'AVL' },
+    'Aston Villa FC':         { color:'#7C3AED', abbr:'AVL' },
+    'Bournemouth':            { color:'#DA291C', abbr:'BOU' },
+    'AFC Bournemouth':        { color:'#DA291C', abbr:'BOU' },
+    'Brentford':              { color:'#EF4444', abbr:'BRE' },
+    'Brentford FC':           { color:'#EF4444', abbr:'BRE' },
+    'Brighton':               { color:'#0057B8', abbr:'BHA' },
+    'Brighton & Hove Albion': { color:'#0057B8', abbr:'BHA' },
+    'Burnley':                { color:'#6B21A8', abbr:'BUR' },
+    'Burnley FC':             { color:'#6B21A8', abbr:'BUR' },
+    'Chelsea':                { color:'#034694', abbr:'CHE' },
+    'Chelsea FC':             { color:'#034694', abbr:'CHE' },
+    'Crystal Palace':         { color:'#1D4ED8', abbr:'CRY' },
+    'Crystal Palace FC':      { color:'#1D4ED8', abbr:'CRY' },
+    'Everton':                { color:'#1D4ED8', abbr:'EVE' },
+    'Everton FC':             { color:'#1D4ED8', abbr:'EVE' },
+    'Fulham':                 { color:'#111111', abbr:'FUL' },
+    'Fulham FC':              { color:'#111111', abbr:'FUL' },
+    'Ipswich':                { color:'#1D4ED8', abbr:'IPS' },
+    'Ipswich Town':           { color:'#1D4ED8', abbr:'IPS' },
+    'Ipswich Town FC':        { color:'#1D4ED8', abbr:'IPS' },
+    'Leeds United':           { color:'#FBBF24', abbr:'LEE' },
+    'Leeds United FC':        { color:'#FBBF24', abbr:'LEE' },
+    'Leicester City':         { color:'#1D4ED8', abbr:'LEI' },
+    'Leicester City FC':      { color:'#1D4ED8', abbr:'LEI' },
+    'Liverpool':              { color:'#C8102E', abbr:'LIV' },
+    'Liverpool FC':           { color:'#C8102E', abbr:'LIV' },
+    'Man City':               { color:'#6CABDD', abbr:'MCI' },
+    'Manchester City':        { color:'#6CABDD', abbr:'MCI' },
+    'Manchester City FC':     { color:'#6CABDD', abbr:'MCI' },
+    'Man United':             { color:'#DA291C', abbr:'MUN' },
+    'Man Utd':                { color:'#DA291C', abbr:'MUN' },
+    'Manchester United':      { color:'#DA291C', abbr:'MUN' },
+    'Manchester United FC':   { color:'#DA291C', abbr:'MUN' },
+    'Newcastle':              { color:'#241F20', abbr:'NEW' },
+    'Newcastle United':       { color:'#241F20', abbr:'NEW' },
+    'Newcastle United FC':    { color:'#241F20', abbr:'NEW' },
+    'Nottm Forest':           { color:'#EF4444', abbr:'NFO' },
+    'Nottingham Forest':      { color:'#EF4444', abbr:'NFO' },
+    'Nottingham Forest FC':   { color:'#EF4444', abbr:'NFO' },
+    'Southampton':            { color:'#DA291C', abbr:'SOU' },
+    'Southampton FC':         { color:'#DA291C', abbr:'SOU' },
+    'Sunderland':             { color:'#EF4444', abbr:'SUN' },
+    'Sunderland AFC':         { color:'#EF4444', abbr:'SUN' },
+    'Tottenham':              { color:'#132257', abbr:'TOT' },
+    'Tottenham Hotspur':      { color:'#132257', abbr:'TOT' },
+    'Tottenham Hotspur FC':   { color:'#132257', abbr:'TOT' },
+    'West Ham':               { color:'#7F1D1D', abbr:'WHU' },
+    'West Ham United':        { color:'#7F1D1D', abbr:'WHU' },
+    'West Ham United FC':     { color:'#7F1D1D', abbr:'WHU' },
+    'Wolves':                 { color:'#F59E0B', abbr:'WOL' },
+    'Wolverhampton Wanderers':{ color:'#F59E0B', abbr:'WOL' },
+    'Wolverhampton Wanderers FC':{ color:'#F59E0B', abbr:'WOL' },
+};
+
+function getTeamColor(name) {
+    if (TEAM_COLORS[name]) return TEAM_COLORS[name].color;
+    for (const [k, v] of Object.entries(TEAM_COLORS)) {
+        if (name.includes(k) || k.includes(name)) return v.color;
+    }
+    return '#1CBFA0';
+}
+
+function getTeamAbbr(name) {
+    if (TEAM_COLORS[name]) return TEAM_COLORS[name].abbr;
+    for (const [k, v] of Object.entries(TEAM_COLORS)) {
+        if (name.includes(k) || k.includes(name)) return v.abbr;
+    }
+    return name.slice(0, 3).toUpperCase();
+}
+
+// Shorten long team names for display in fixture pairs
+function shortName(name) {
+    const shorts = {
+        'Manchester City': 'Man City', 'Manchester City FC': 'Man City',
+        'Manchester United': 'Man Utd', 'Manchester United FC': 'Man Utd',
+        'Brighton & Hove Albion': 'Brighton', 'Tottenham Hotspur': 'Spurs',
+        'Tottenham Hotspur FC': 'Spurs', 'Newcastle United': 'Newcastle',
+        'Newcastle United FC': 'Newcastle', 'Nottingham Forest': 'Nott\'m Forest',
+        'Nottingham Forest FC': 'Nott\'m Forest', 'Wolverhampton Wanderers': 'Wolves',
+        'Wolverhampton Wanderers FC': 'Wolves', 'AFC Bournemouth': 'Bournemouth',
+        'Leicester City FC': 'Leicester', 'Ipswich Town FC': 'Ipswich',
+        'Aston Villa FC': 'Aston Villa', 'Crystal Palace FC': 'Crystal Palace',
+        'West Ham United FC': 'West Ham', 'West Ham United': 'West Ham',
+        'Leeds United FC': 'Leeds', 'Southampton FC': 'Southampton',
+        'Brentford FC': 'Brentford', 'Arsenal FC': 'Arsenal',
+        'Chelsea FC': 'Chelsea', 'Everton FC': 'Everton',
+        'Fulham FC': 'Fulham', 'Liverpool FC': 'Liverpool',
+        'Burnley FC': 'Burnley',
+    };
+    return shorts[name] || name;
+}
 
 // ── LOCALSTORAGE HELPERS ──────────────────────────────────────────────────────
 function savedGames() {
@@ -1443,87 +1616,147 @@ function showLoading() {
         </div>`;
 }
 
+// ── BOTTOM NAV ───────────────────────────────────────────────────────────────
+function renderBottomNav(activeTab) {
+    const isHost = role === 'host';
+    const tabs = [
+        { id:'home',  icon:'⌂', label:'Home'  },
+        { id:'pick',  icon:'✦', label:'Pick'  },
+        { id:'stats', icon:'▦', label:'Stats' },
+    ];
+    if (isHost) tabs.push({ id:'admin', icon:'⚙', label:'Admin' });
+
+    return `<div class="bottom-nav">
+        ${tabs.map(t => `
+            <div class="bnav-item${activeTab===t.id?' bnav-active':''}" onclick="navTo('${t.id}')">
+                <span class="bnav-icon">${t.icon}</span>
+                <span class="bnav-label">${t.label}</span>
+            </div>`).join('')}
+    </div>`;
+}
+
+function navTo(tab) {
+    if (tab === 'home') {
+        if (role === 'host') hostView = 'player';
+        playerSubView = 'main';
+        render();
+    } else if (tab === 'pick') {
+        if (role === 'host') hostView = 'player';
+        playerSubView = 'main';
+        render();
+    } else if (tab === 'stats') {
+        playerSubView = 'stats';
+        statsTab = 'leaderboard';
+        render();
+    } else if (tab === 'admin') {
+        if (role === 'host') { hostView = 'admin'; playerSubView = 'main'; }
+        render();
+    }
+}
+
 // ── HOME ─────────────────────────────────────────────────────────────────────
+
+let homeMode = 'join'; // 'join' | 'create'
+
+function setHomeMode(mode) {
+    homeMode = mode;
+    renderHome();
+    setTimeout(() => {
+        const el = document.getElementById(mode === 'join' ? 'joinCode' : 'hostName');
+        if (el) el.focus();
+    }, 50);
+}
 
 function renderHome() {
     const games = savedGames();
     const savedHtml = games.length ? `
-        <div class="card">
-            <div class="section-label" style="margin-bottom:12px">Your games</div>
-            ${games.map(g => `
-                <div class="saved-game-row">
-                    <div class="saved-game-info">
-                        <div class="saved-game-name">${esc(g.gameName || g.code)}</div>
-                        <div class="saved-game-meta">${esc(g.code)} · ${g.role === 'host' ? '👔 Host' : esc(g.name)}</div>
-                    </div>
-                    <button class="btn btn-primary btn-sm" onclick="continueGame('${esc(g.code)}')">Continue →</button>
-                </div>`).join('')}
+        <div>
+            <div class="section-label-white">YOUR GAMES</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                ${games.map(g => `
+                    <div class="game-card" onclick="continueGame('${esc(g.code)}')">
+                        <div class="game-card-accent" style="background:${g.role==='host'?'var(--teal)':'var(--lime)'}"></div>
+                        <div>
+                            <div style="font-weight:800;font-size:14px;color:var(--dark);margin-bottom:3px">${esc(g.gameName || g.code)}</div>
+                            <div style="font-size:11px;color:#6B7280">${g.role === 'host' ? 'Host' : esc(g.name)}</div>
+                        </div>
+                        <span class="code-badge">${esc(g.code)}</span>
+                    </div>`).join('')}
+            </div>
         </div>` : '';
+
+    const joinForm = `
+        <div class="glass-field">
+            <label class="glass-label">GAME CODE</label>
+            <div class="glass-box">
+                <input type="text" id="joinCode" placeholder="e.g. AB3X" maxlength="4"
+                    style="text-transform:uppercase;letter-spacing:4px;font-size:18px"
+                    oninput="this.value=this.value.toUpperCase()"
+                    onkeydown="if(event.key==='Enter')document.getElementById('joinName').focus()">
+            </div>
+        </div>
+        <div class="glass-field">
+            <label class="glass-label">YOUR NAME</label>
+            <div class="glass-box">
+                <input type="text" id="joinName" placeholder="Enter your name…"
+                    onkeydown="if(event.key==='Enter')doJoin()">
+            </div>
+        </div>
+        <button class="btn-cta" onclick="doJoin()">JOIN GAME</button>
+        <div style="text-align:center;margin-top:8px;font-size:11px;color:rgba(255,255,255,0.4)">No account needed. Enter the code from your host.</div>`;
+
+    const createForm = `
+        <div class="glass-field">
+            <label class="glass-label">GAME NAME</label>
+            <div class="glass-box">
+                <input type="text" id="hostGameName" placeholder="e.g. Office League 2025…"
+                    onkeydown="if(event.key==='Enter')document.getElementById('hostName').focus()">
+            </div>
+        </div>
+        <div class="glass-field">
+            <label class="glass-label">YOUR NAME</label>
+            <div class="glass-box">
+                <input type="text" id="hostName" placeholder="Enter your name…"
+                    onkeydown="if(event.key==='Enter')doCreateGame()">
+            </div>
+        </div>
+        <button class="btn-cta" onclick="doCreateGame()">CREATE GAME</button>
+        <div style="text-align:center;margin-top:8px;font-size:11px;color:rgba(255,255,255,0.4)">Share the code with friends so they can join.</div>`;
 
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
-            <div class="card">
-                <div class="home-icon">⚽</div>
-                <h2 style="font-size:22px;text-align:center;margin-bottom:8px">Last Man Standing</h2>
-                <p class="help-text" style="text-align:center;margin-bottom:24px">
-                    Premier League survivor. One pick per week — don't pick the same team twice. Last one left wins.
-                </p>
-
-                <button class="btn btn-primary btn-full" style="margin-bottom:10px" onclick="showHostForm()">
-                    Host a Game
-                </button>
-                <button class="btn btn-outline btn-full" onclick="showJoinForm()">
-                    Join a Game
-                </button>
-
-                <div id="hostForm" style="display:none;margin-top:20px">
-                    <div class="divider"></div>
-                    <p class="section-label" style="margin-bottom:10px">Set up your game</p>
-                    <input type="text" id="hostName" placeholder="Your name" style="margin-bottom:10px"
-                        onkeydown="if(event.key==='Enter')document.getElementById('hostGameName').focus()">
-                    <input type="text" id="hostGameName" placeholder="Game name (optional, e.g. Office League)"
-                        style="margin-bottom:12px" onkeydown="if(event.key==='Enter')doCreateGame()">
-                    <button class="btn btn-primary btn-full" onclick="doCreateGame()">Create Game →</button>
-                </div>
-
-                <div id="joinForm" style="display:none;margin-top:20px">
-                    <div class="divider"></div>
-                    <p class="section-label" style="margin-bottom:10px">Enter your details</p>
-                    <input type="text" id="joinCode" placeholder="Game code (e.g. AB3X)"
-                        style="margin-bottom:10px;text-transform:uppercase;letter-spacing:3px;font-weight:700;text-align:center;font-size:18px"
-                        maxlength="4" oninput="this.value=this.value.toUpperCase()"
-                        onkeydown="if(event.key==='Enter')document.getElementById('joinName').focus()">
-                    <input type="text" id="joinName" placeholder="Your name"
-                        style="margin-bottom:12px"
-                        onkeydown="if(event.key==='Enter')doJoin()">
-                    <button class="btn btn-success btn-full" onclick="doJoin()">Join →</button>
-                </div>
-
-                <p class="error-msg" id="homeError"></p>
+            <div class="hero-head">
+                <div class="hero-label">LAST MAN</div>
+                <div class="hero-title">STANDING</div>
+                <div class="hero-sub">Premier League · Survivor</div>
             </div>
+
             ${savedHtml}
+
+            <div class="glass-toggle">
+                <button class="glass-toggle-btn${homeMode==='join'?' active':''}" onclick="setHomeMode('join')">Join</button>
+                <button class="glass-toggle-btn${homeMode==='create'?' active':''}" onclick="setHomeMode('create')">Create</button>
+            </div>
+
+            ${homeMode === 'join' ? joinForm : createForm}
+
+            <p class="error-msg" id="homeError"></p>
         </div>`;
 
     // Pre-fill from URL ?join=CODE
     const urlCode = new URLSearchParams(window.location.search).get('join');
     if (urlCode) {
-        showJoinForm();
-        const el = document.getElementById('joinCode');
-        if (el) el.value = urlCode.toUpperCase().slice(0, 4);
+        homeMode = 'join';
+        renderHome();
+        setTimeout(() => {
+            const el = document.getElementById('joinCode');
+            if (el) el.value = urlCode.toUpperCase().slice(0, 4);
+        }, 50);
     }
 }
 
-function showHostForm() {
-    const j = document.getElementById('joinForm'); if (j) j.style.display = 'none';
-    const f = document.getElementById('hostForm');
-    if (f) { f.style.display = 'block'; document.getElementById('hostName').focus(); }
-}
-
-function showJoinForm() {
-    const h = document.getElementById('hostForm'); if (h) h.style.display = 'none';
-    const f = document.getElementById('joinForm');
-    if (f) { f.style.display = 'block'; document.getElementById('joinCode').focus(); }
-}
+function showHostForm() { setHomeMode('create'); }
+function showJoinForm() { setHomeMode('join'); }
 
 function showHomeError(msg) {
     render();
@@ -1989,10 +2222,12 @@ function renderPlayerLobby() {
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderHostPlayerBanner()}
+            <div class="hero-head">
+                <div class="hero-label">${esc(G.gameName || gameCode)}</div>
+                <div class="hero-title">LOBBY</div>
+                <div class="hero-sub">Waiting for host to start · ${ps.length} player${ps.length!==1?'s':''}</div>
+            </div>
             <div class="card">
-                <div class="phase-label">Lobby — Game ${esc(G.gameName || gameCode)}</div>
-                <h2>You're in!</h2>
-                <p class="help-text">Waiting for the host to start the game.</p>
                 ${ps.map(p => `
                     <div class="player-row">
                         <span class="player-name">${esc(p.name)}</span>
@@ -2002,8 +2237,8 @@ function renderPlayerLobby() {
                     <div class="divider"></div>
                     <button class="btn btn-outline btn-full btn-sm" onclick="leaveGamePermanently()">Leave Game</button>` : ''}
             </div>
-            ${renderMyPickHistoryBtn()}
-        </div>`;
+        </div>
+        ${renderBottomNav('home')}`;
 }
 
 function renderPlayerPicking(round) {
@@ -2013,46 +2248,90 @@ function renderPlayerPicking(round) {
     const myPlayer  = getPlayer(myPlayerId);
     const usedTeams = myPlayer?.usedTeams || {};
 
-    // Feature 4 — all 20 teams; used ones greyed out, available ones tappable
-    const teamGrid = getTeams().map(t => {
-        const isUsed     = !!usedTeams[t];
-        const isSelected = myPick.team === t;
-        if (isUsed) {
-            return `<button class="team-btn team-used" disabled title="Already used">${esc(t)}</button>`;
-        }
-        return `<button class="team-btn${isSelected ? ' team-selected' : ''}"
-            data-team="${esc(t)}" onclick="playerSetPick(this.dataset.team)">${esc(t)}</button>`;
-    }).join('');
-
-    // Feature 2 — countdown if admin set a close time
+    // Feature 2 — countdown
     const countdownHtml = round.closeTime ? `
         <div class="countdown-box">
             <div class="cd-label">Picks close in</div>
             <div class="cd-time" id="countdownDisplay">—</div>
         </div>` : '';
 
+    // Build fixture pairs from API data if available, otherwise pair up team list
+    let fixtureRows = '';
+    const fixtures = cachedMatchday?.matches || [];
+    if (fixtures.length) {
+        fixtureRows = fixtures.map(fx => {
+            const home     = fx.homeTeam?.name || '';
+            const away     = fx.awayTeam?.name || '';
+            const homeShort = shortName(home);
+            const awayShort = shortName(away);
+            const homeColor = getTeamColor(home);
+            const awayColor = getTeamColor(away);
+            const homeAbbr  = getTeamAbbr(home);
+            const awayAbbr  = getTeamAbbr(away);
+            const homeSel   = myPick.team === home || myPick.team === homeShort;
+            const awaySel   = myPick.team === away || myPick.team === awayShort;
+            const homeUsed  = !!usedTeams[home] || !!usedTeams[homeShort];
+            const awayUsed  = !!usedTeams[away] || !!usedTeams[awayShort];
+
+            const homeShadow = homeSel
+                ? `0 0 0 3px ${homeColor},0 4px 12px ${homeColor}66`
+                : homeUsed ? 'none' : `0 2px 8px ${homeColor}44`;
+            const awayShadow = awaySel
+                ? `0 0 0 3px ${awayColor},0 4px 12px ${awayColor}66`
+                : awayUsed ? 'none' : `0 2px 8px ${awayColor}44`;
+
+            return `<div class="fixture-pair">
+                <div class="fixture-sheen"></div>
+                <div class="fixture-inner">
+                    <div class="team-side${homeUsed?' team-used-side':''}" onclick="${homeUsed?'':'playerSetPick('+JSON.stringify(homeShort)+')'}">
+                        <div class="team-circle" style="background:radial-gradient(circle at 35% 35%,${homeColor}cc,${homeColor});box-shadow:${homeShadow};opacity:${homeUsed?0.4:1}">${homeAbbr.slice(0,1)}</div>
+                        <span class="team-name-txt" style="color:${homeUsed?'#9CA3AF':'var(--dark)'}">${esc(homeShort)}</span>
+                    </div>
+                    <span class="vs-txt">vs</span>
+                    <div class="team-side t-away${awayUsed?' team-used-side':''}" onclick="${awayUsed?'':'playerSetPick('+JSON.stringify(awayShort)+')'}">
+                        <span class="team-name-txt" style="color:${awayUsed?'#9CA3AF':'var(--dark)'}">${esc(awayShort)}</span>
+                        <div class="team-circle" style="background:radial-gradient(circle at 35% 35%,${awayColor}cc,${awayColor});box-shadow:${awayShadow};opacity:${awayUsed?0.4:1}">${awayAbbr.slice(0,1)}</div>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    } else {
+        // Fallback: team grid (no API data)
+        const teamGrid = getTeams().map(t => {
+            const isUsed     = !!usedTeams[t];
+            const isSelected = myPick.team === t;
+            if (isUsed) return `<button class="team-btn team-used" disabled>${esc(t)}</button>`;
+            return `<button class="team-btn${isSelected?' team-selected':''}" onclick="playerSetPick(${JSON.stringify(t)})">${esc(t)}</button>`;
+        }).join('');
+        fixtureRows = `<div class="team-grid">${teamGrid}</div>`;
+    }
+
+    // Pick hero
+    const selectedTeam = myPick.team || '';
+    const heroColor    = selectedTeam ? getTeamColor(selectedTeam) : null;
+    const heroAbbr     = selectedTeam ? getTeamAbbr(selectedTeam) : '';
+    const heroHtml = selectedTeam ? `
+        <div class="pick-hero">
+            <div class="pick-hero-label">TEAM SELECTED</div>
+            <div class="pick-hero-circle" style="background:radial-gradient(circle at 35% 35%,${heroColor}cc,${heroColor});box-shadow:0 4px 20px ${heroColor}55,0 0 0 3px rgba(255,255,255,0.18)">${heroAbbr.slice(0,1)}</div>
+            <div class="pick-hero-name">${esc(selectedTeam)}</div>
+        </div>` : `
+        <div class="pick-hero">
+            <div style="font-size:40px;margin-bottom:8px">⚽</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.6)">Tap a team to make your pick</div>
+        </div>`;
+
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderHostPlayerBanner()}
-            ${renderSurvivalBanner()}
-            <div class="card">
-                <div class="phase-label">Round ${round.id} — Your Pick</div>
-                <h2>Choose your team</h2>
-                ${countdownHtml}
-                <p class="help-text" style="margin-bottom:12px">
-                    Tap a team to pick it. Greyed-out teams have already been used this season.
-                    Your pick saves immediately — you can change it until the host locks picks.
-                </p>
-                <div class="team-grid">${teamGrid}</div>
-                ${myPick.team ? `
-                    <div class="picked-confirm">
-                        ✅ Current pick: <strong>${esc(myPick.team)}</strong>
-                    </div>` : ''}
+            ${heroHtml}
+            ${countdownHtml}
+            <div class="fixture-section-label">ROUND ${round.id} — TAP HOME OR AWAY TO PICK</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+                ${fixtureRows}
             </div>
-            ${renderMyPickHistoryBtn()}
-            ${renderPhase3Nav()}
-            ${renderStandings()}
-        </div>`;
+        </div>
+        ${renderBottomNav('pick')}`;
 
     if (round.closeTime) startCountdown(round.closeTime);
 }
@@ -2076,9 +2355,9 @@ function renderPlayerWaiting(msg) {
                 <p style="color:var(--grey);line-height:1.6">${esc(msg)}</p>
             </div>
             ${renderMyPickHistoryBtn()}
-            ${renderPhase3Nav()}
             ${renderStandings()}
-        </div>`;
+        </div>
+        ${renderBottomNav('home')}`;
 
     if (round?.closeTime && round.status === 'picking') startCountdown(round.closeTime);
 }
@@ -2092,10 +2371,9 @@ function renderPlayerEliminated() {
                 <div style="font-size:36px;margin-bottom:10px">😬</div>
                 <p style="color:var(--grey);font-size:14px;line-height:1.6">You're out this cycle. Once someone wins, everyone's back in for the next round.</p>
             </div>
-            ${renderMyPickHistoryBtn()}
-            ${renderPhase3Nav()}
             ${renderStandings()}${renderHistory()}
-        </div>`;
+        </div>
+        ${renderBottomNav('home')}`;
 }
 
 function renderPlayerRoundDone(round) {
@@ -2132,28 +2410,32 @@ function renderPlayerRoundDone(round) {
             </div>
             ${renderRoundPickReveal(round)}
             ${renderMyPickHistoryBtn()}
-            ${renderPhase3Nav()}
             ${renderStandings()}${renderHistory()}
-        </div>`;
+        </div>
+        ${renderBottomNav('home')}`;
 }
 
 // ── Feature 1 — Confirmation screen ──────────────────────────────────────────
 
 function renderPlayerConfirmation(round) {
     const myPlayer = getPlayer(myPlayerId);
+    const heroColor = getTeamColor(lastConfirmedTeam);
+    const heroAbbr  = getTeamAbbr(lastConfirmedTeam);
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
-            <div class="card pick-confirmation">
-                <div style="font-size:48px;margin-bottom:6px">✅</div>
-                <div style="font-size:12px;color:var(--grey);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px">Round ${round?.id || ''} — Pick confirmed</div>
-                <div class="conf-team">${esc(lastConfirmedTeam)}</div>
-                <div class="conf-meta">
-                    <strong>${esc(myPlayer?.name || '')}</strong><br>
-                    Pick saved. You can change it until the host locks picks.
-                </div>
-                <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
+            <div class="pick-hero" style="padding-top:16px">
+                <div class="pick-hero-label">PICK CONFIRMED</div>
+                <div class="pick-hero-circle" style="background:radial-gradient(circle at 35% 35%,${heroColor}cc,${heroColor});box-shadow:0 4px 20px ${heroColor}55,0 0 0 3px rgba(255,255,255,0.18)">${heroAbbr.slice(0,1)}</div>
+                <div class="pick-hero-name">${esc(lastConfirmedTeam)}</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:8px">${esc(myPlayer?.name || '')} · Round ${round?.id || ''}</div>
             </div>
-        </div>`;
+            <div class="card" style="text-align:center;padding:20px">
+                <p style="color:var(--grey);font-size:13px;line-height:1.6">Pick saved. You can change it until the host locks picks.</p>
+                <button class="btn btn-outline btn-full" style="margin-top:14px" onclick="playerSubView='main';render()">← Change Pick</button>
+            </div>
+        </div>
+        ${renderBottomNav('pick')}`;
+    }
 }
 
 // ── Feature 3 — Personal pick history ────────────────────────────────────────
@@ -2183,7 +2465,9 @@ function renderPlayerPickHistory() {
                 <div style="margin-top:12px">${rows}</div>
             </div>
             <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
-        </div>`;
+        </div>
+        ${renderBottomNav('home')}`;
+    }
 }
 
 // ── COMPLETE ─────────────────────────────────────────────────────────────────
@@ -2324,8 +2608,9 @@ function renderPlayerFeed() {
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderResultsFeed() || '<div class="card"><div class="empty-state">No completed rounds yet.</div></div>'}
-            <button class="btn btn-outline btn-full" onclick="playerSubView=\'main\';render()">← Back</button>
-        </div>`;
+            <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
+        </div>
+        ${renderBottomNav('home')}`;
 }
 
 // ── PHASE 3: ALL PICKS SCREEN ─────────────────────────────────────────────────
@@ -2334,8 +2619,9 @@ function renderPlayerAllPicks() {
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderHistory()}
-            <button class="btn btn-outline btn-full" onclick="playerSubView=\'main\';render()">← Back</button>
-        </div>`;
+            <button class="btn btn-outline btn-full" onclick="playerSubView='main';render()">← Back</button>
+        </div>
+        ${renderBottomNav('home')}`;
 }
 
 // ── PHASE 3: SEASON STATS ─────────────────────────────────────────────────────
@@ -2419,13 +2705,12 @@ function renderPhase3Nav() {
 // ── STATS & LEADERBOARD PAGE ─────────────────────────────────────────────────
 
 function renderStatsPage() {
-    const tabs = [
-        ['leaderboard', '🏆 Leaderboard'],
-        ['season',      '📊 Season Stats'],
-        ['history',     '📋 Pick History'],
-    ];
-    const tabBar = tabs.map(([id, label]) =>
-        `<button class="stats-tab-btn${statsTab === id ? ' tab-active' : ''}" onclick="statsTab='${id}';render()">${label}</button>`
+    const round = currentRound();
+    const done  = rounds().filter(r => r.status === 'done');
+    const tabLabels = ['Leaderboard', 'Season Stats', 'Pick History'];
+    const tabIds    = ['leaderboard', 'season', 'history'];
+    const tabBar = tabIds.map((id, i) =>
+        `<button class="seg-tab-btn${statsTab===id?' tab-active':''}" onclick="statsTab='${id}';render()">${tabLabels[i]}</button>`
     ).join('');
 
     let content = '';
@@ -2436,13 +2721,14 @@ function renderStatsPage() {
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderHostPlayerBanner()}
-            <button class="btn btn-outline btn-full btn-sm" style="margin-bottom:12px" onclick="playerSubView='main';render()">← Back</button>
-            <div class="card" style="padding-bottom:12px">
-                <h2 style="margin-bottom:14px">Stats &amp; Leaderboard</h2>
-                <div class="stats-tabs">${tabBar}</div>
+            <div class="hero-head">
+                <div class="hero-title">STANDINGS</div>
+                <div class="hero-sub">${done.length ? `Gameweek ${done[done.length-1]?.id || '?'} · Season 2024/25` : 'Season 2024/25'}</div>
             </div>
+            <div class="seg-tabs">${tabBar}</div>
             ${content}
-        </div>`;
+        </div>
+        ${renderBottomNav('stats')}`;
 }
 
 function renderLeaderboardTab() {
@@ -2454,48 +2740,70 @@ function renderLeaderboardTab() {
     const ranked = ps.map(p => {
         const pts  = p.seasonPoints || 0;
         const wins = p.cycleWins || 0;
-        const lastFive = done.slice(-5).map(r => {
+        // Last 3 picks as pill abbreviations
+        const lastPicks = done.slice(-3).map(r => {
             const pick = (r.picks || {})[p.id];
-            if (!pick || !pick.result) return 'empty';
-            return pick.result === 'win' ? 'win' : 'out';
-        });
-        // Pad to 5 if fewer rounds played
-        while (lastFive.length < 5) lastFive.unshift('empty');
-        return { p, pts, wins, lastFive };
+            return pick?.team ? getTeamAbbr(pick.team) : null;
+        }).filter(Boolean);
+        return { p, pts, wins, lastPicks };
     }).sort((a, b) => b.pts - a.pts || b.wins - a.wins || a.p.name.localeCompare(b.p.name));
 
-    const medal = ['🥇','🥈','🥉'];
-    const rows = ranked.map(({ p, pts, wins, lastFive }, i) => {
-        const isMe   = p.id === myPlayerId;
-        const rank   = medal[i] || `${i + 1}.`;
-        const status = p.active
-            ? `<span class="status-pill pill-in" style="font-size:10px">In</span>`
-            : `<span class="status-pill pill-out" style="font-size:10px">Out</span>`;
-        const form = lastFive.map(r => `<div class="form-dot ${r}"></div>`).join('');
-        return `<tr class="${isMe ? 'lb-me' : ''}">
-            <td class="lb-rank">${rank}</td>
-            <td class="lb-name">${esc(p.name)}${isMe ? '<br><span style="font-size:10px;font-weight:400;color:var(--grey)">(you)</span>' : ''}</td>
-            <td class="lb-pts">${pts}</td>
-            <td style="font-weight:700;color:#6b7280">${wins}</td>
-            <td><div class="form-guide">${form}</div></td>
-            <td>${status}</td>
-        </tr>`;
-    }).join('');
+    const alive  = ranked.filter(r => r.p.active);
+    const elim   = ranked.filter(r => !r.p.active);
+    const medalColors = ['#C8F06A','#9CA3AF','#E5E7EB'];
 
-    return `<div class="card" style="padding:0;overflow:hidden">
-        <table class="lb-table">
-            <thead><tr>
-                <th></th>
-                <th>Player</th>
-                <th>Pts</th>
-                <th>🏆</th>
-                <th>Last 5</th>
-                <th>Status</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-        </table>
-    </div>
-    <p class="help-text" style="text-align:center;margin-top:8px;font-size:11px">Form dots: green = survived, red = out. 🏆 = cycle wins.</p>`;
+    function makeInitials(name) {
+        return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    }
+
+    function aliveCard({ p, pts, wins, lastPicks }, i) {
+        const isMe = p.id === myPlayerId;
+        return `<div class="lb-card${isMe?' lb-me':''}">
+            <div class="medal-badge" style="background:${medalColors[i]||'#E5E7EB'}">${i+1}</div>
+            <div class="av av-teal" style="width:36px;height:36px;font-size:13px">${makeInitials(p.name)}</div>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:13px;color:var(--dark);margin-bottom:3px">${esc(p.name)}${isMe?'<span style="font-size:9px;color:var(--teal);margin-left:5px">YOU</span>':''}</div>
+                <div style="display:flex;gap:3px;flex-wrap:wrap">${lastPicks.map(pk=>`<span class="pick-pill">${pk}</span>`).join('')}</div>
+            </div>
+            <div style="text-align:right;margin-right:6px">
+                <div style="font-weight:800;font-size:15px;color:var(--dark)">${pts}</div>
+                <div style="font-size:9px;color:#6B7280;margin-top:1px">pts</div>
+            </div>
+            <span style="font-size:9px;font-weight:700;color:var(--teal);letter-spacing:0.06em">ALIVE</span>
+        </div>`;
+    }
+
+    function elimCard({ p, pts, wins, lastPicks }, i) {
+        return `<div class="lb-card lb-dim">
+            <div class="av av-dim" style="width:36px;height:36px;font-size:13px">${makeInitials(p.name)}</div>
+            <div style="flex:1;min-width:0">
+                <div style="font-weight:700;font-size:13px;color:#6B7280">${esc(p.name)}</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:2px">Out · ${pts} pts</div>
+            </div>
+            <span style="font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:0.06em">OUT</span>
+        </div>`;
+    }
+
+    return `
+        ${alive.length ? `
+        <div>
+            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--lime);border-radius:13px;padding:5px 12px;margin-bottom:10px;box-shadow:0 2px 8px rgba(200,240,106,0.4)">
+                <span style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--dark)">SURVIVORS</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+                ${alive.map((r, i) => aliveCard(r, i)).join('')}
+            </div>
+        </div>` : ''}
+        ${elim.length ? `
+        <div>
+            <div style="display:inline-flex;align-items:center;gap:5px;background:#E5E7EB;border-radius:13px;padding:5px 12px;margin-bottom:10px">
+                <span style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:#6B7280">ELIMINATED</span>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+                ${elim.map((r, i) => elimCard(r, i)).join('')}
+            </div>
+        </div>` : ''}
+        <p style="text-align:center;font-size:10px;color:rgba(255,255,255,0.5);margin-top:4px">Last 3 picks shown · 🏆 = cycle wins</p>`;
 }
 
 function renderSeasonStatsTab() {
