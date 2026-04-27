@@ -231,6 +231,8 @@
         .box-green h3 { color: #065f46; }
         .box-red   { background: #fff1f2; border: 1px solid #fecdd3; }
         .box-red h3 { color: #9f1239; }
+        .box-blue  { background: #eff6ff; border: 1px solid #bfdbfe; }
+        .box-blue h3 { color: #1e40af; }
 
         .winner-banner {
             background: linear-gradient(135deg, #37003c, #7c3aed);
@@ -804,16 +806,15 @@ function formatDatetimeLocal(iso) {
 function renderSurvivalBanner() {
     const p = getPlayer(myPlayerId);
     if (!p) return '';
-    const doneCount = rounds().filter(r => r.status === 'done').length;
+    const pts  = p.seasonPoints || 0;
+    const ptsLabel = `${pts} pt${pts !== 1 ? 's' : ''} this season`;
 
     if (!p.active) {
-        const elimRound = rounds().find(r => r.id === p.eliminatedRound);
-        const lastPick  = elimRound ? (elimRound.picks || {})[myPlayerId] : null;
         return `<div class="survival-banner elim">
             <div class="sb-icon">❌</div>
             <div>
-                <div class="sb-title">Eliminated — Round ${p.eliminatedRound}</div>
-                ${lastPick?.team ? `<div class="sb-sub">${esc(lastPick.team)} didn't win</div>` : ''}
+                <div class="sb-title">Out this cycle</div>
+                <div class="sb-sub">Waiting for a winner — ${ptsLabel}</div>
             </div>
         </div>`;
     }
@@ -821,7 +822,7 @@ function renderSurvivalBanner() {
         <div class="sb-icon">✅</div>
         <div>
             <div class="sb-title">Still in!</div>
-            <div class="sb-sub">${doneCount > 0 ? `Survived ${doneCount} round${doneCount !== 1 ? 's' : ''}` : 'Game in progress'}</div>
+            <div class="sb-sub">${ptsLabel}</div>
         </div>
     </div>`;
 }
@@ -876,8 +877,9 @@ async function createGame(hostName, gameName) {
         gameName: gName,
         winner: null,
         nextId: 2,
+        cycleStartRound: 1,
         players: {
-            p1: { id: 'p1', name: hostName, active: true, usedTeams: {}, eliminatedRound: null }
+            p1: { id: 'p1', name: hostName, active: true, usedTeams: {}, eliminatedRound: null, cycleWins: 0, seasonPoints: 0 }
         },
         rounds: {}
     });
@@ -913,7 +915,7 @@ async function joinGame(code, name) {
     const pid = 'p' + nextId;
 
     await db.ref(`games/${code}/players/${pid}`).set({
-        id: pid, name, active: true, usedTeams: {}, eliminatedRound: null
+        id: pid, name, active: true, usedTeams: {}, eliminatedRound: null, cycleWins: 0, seasonPoints: 0
     });
     await db.ref(`games/${code}/nextId`).set(nextId + 1);
 
@@ -1062,12 +1064,17 @@ async function processResultsFromAPI(matches) {
     const picks = Object.values(round.picks || {});
     const updates = {};
 
+    const cycleStart = G.cycleStartRound || 1;
+    const pointsThisRound = round.id - cycleStart + 1;
+
     picks.forEach(pick => {
         const result = winSet.has(pick.team) ? 'win' : 'out';
         updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/result`] = result;
         if (result === 'out') {
             updates[`games/${gameCode}/players/${pick.playerId}/active`] = false;
             updates[`games/${gameCode}/players/${pick.playerId}/eliminatedRound`] = round.id;
+            updates[`games/${gameCode}/players/${pick.playerId}/seasonPoints`] =
+                (getPlayer(pick.playerId)?.seasonPoints || 0) + pointsThisRound;
         }
     });
 
@@ -1084,11 +1091,25 @@ async function processResultsFromAPI(matches) {
     });
 
     if (survivors.length === 1) {
-        updates[`games/${gameCode}/status`] = 'complete';
-        updates[`games/${gameCode}/winner`] = survivors[0].id;
+        const winner = survivors[0];
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleWinner`] = winner.id;
+        updates[`games/${gameCode}/players/${winner.id}/cycleWins`] = (winner.cycleWins || 0) + 1;
+        updates[`games/${gameCode}/players/${winner.id}/seasonPoints`] = (winner.seasonPoints || 0) + pointsThisRound + 1;
+        updates[`games/${gameCode}/cycleStartRound`] = round.id + 1;
+        players().forEach(p => {
+            updates[`games/${gameCode}/players/${p.id}/active`] = true;
+            updates[`games/${gameCode}/players/${p.id}/eliminatedRound`] = null;
+            updates[`games/${gameCode}/players/${p.id}/usedTeams`] = {};
+        });
     } else if (survivors.length === 0) {
-        updates[`games/${gameCode}/status`] = 'complete';
-        updates[`games/${gameCode}/winner`] = null;
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleWinner`] = null;
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleNoWinner`] = true;
+        updates[`games/${gameCode}/cycleStartRound`] = round.id + 1;
+        players().forEach(p => {
+            updates[`games/${gameCode}/players/${p.id}/active`] = true;
+            updates[`games/${gameCode}/players/${p.id}/eliminatedRound`] = null;
+            updates[`games/${gameCode}/players/${p.id}/usedTeams`] = {};
+        });
     }
 
     await db.ref().update(updates);
@@ -1233,13 +1254,6 @@ async function hostLockPicks() {
         return;
     }
 
-    const teams = picks.map(p => p.team);
-    const dupes = teams.filter((t, i) => teams.indexOf(t) !== i);
-    if (dupes.length) {
-        alert(`Duplicate pick: ${[...new Set(dupes)].join(', ')}. Each player must pick a different team.`);
-        return;
-    }
-
     const updates = {};
     picks.forEach(pick => {
         updates[`games/${gameCode}/players/${pick.playerId}/usedTeams/${pick.team}`] = true;
@@ -1256,12 +1270,17 @@ async function hostSubmitResults() {
 
     const updates = {};
 
+    const cycleStart = G.cycleStartRound || 1;
+    const pointsThisRound = round.id - cycleStart + 1;
+
     picks.forEach(pick => {
         const result = winSet.has(pick.team) ? 'win' : 'out';
         updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/result`] = result;
         if (result === 'out') {
             updates[`games/${gameCode}/players/${pick.playerId}/active`] = false;
             updates[`games/${gameCode}/players/${pick.playerId}/eliminatedRound`] = round.id;
+            updates[`games/${gameCode}/players/${pick.playerId}/seasonPoints`] =
+                (getPlayer(pick.playerId)?.seasonPoints || 0) + pointsThisRound;
         }
     });
 
@@ -1271,7 +1290,6 @@ async function hostSubmitResults() {
 
     updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'done';
 
-    // Determine survivors after this round
     const survivors = players().filter(p => {
         if (!p.active) return false;
         const pick = picks.find(pk => pk.playerId === p.id);
@@ -1279,11 +1297,25 @@ async function hostSubmitResults() {
     });
 
     if (survivors.length === 1) {
-        updates[`games/${gameCode}/status`] = 'complete';
-        updates[`games/${gameCode}/winner`] = survivors[0].id;
+        const winner = survivors[0];
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleWinner`] = winner.id;
+        updates[`games/${gameCode}/players/${winner.id}/cycleWins`] = (winner.cycleWins || 0) + 1;
+        updates[`games/${gameCode}/players/${winner.id}/seasonPoints`] = (winner.seasonPoints || 0) + pointsThisRound + 1;
+        updates[`games/${gameCode}/cycleStartRound`] = round.id + 1;
+        players().forEach(p => {
+            updates[`games/${gameCode}/players/${p.id}/active`] = true;
+            updates[`games/${gameCode}/players/${p.id}/eliminatedRound`] = null;
+            updates[`games/${gameCode}/players/${p.id}/usedTeams`] = {};
+        });
     } else if (survivors.length === 0) {
-        updates[`games/${gameCode}/status`] = 'complete';
-        updates[`games/${gameCode}/winner`] = null;
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleWinner`] = null;
+        updates[`games/${gameCode}/rounds/r${round.id}/cycleNoWinner`] = true;
+        updates[`games/${gameCode}/cycleStartRound`] = round.id + 1;
+        players().forEach(p => {
+            updates[`games/${gameCode}/players/${p.id}/active`] = true;
+            updates[`games/${gameCode}/players/${p.id}/eliminatedRound`] = null;
+            updates[`games/${gameCode}/players/${p.id}/usedTeams`] = {};
+        });
     }
 
     await db.ref().update(updates);
@@ -1548,7 +1580,7 @@ function renderAdminPlayerManagement() {
     const rows = ps.map(p => `
         <div class="override-row">
             <span class="or-name">${esc(p.name)}</span>
-            <span class="status-pill ${p.active ? 'pill-in' : 'pill-out'}" style="font-size:10px">${p.active ? 'In' : `Rd ${p.eliminatedRound}`}</span>
+            <span class="status-pill ${p.active ? 'pill-in' : 'pill-out'}" style="font-size:10px">${p.active ? 'In' : 'Inactive'}</span>
             ${p.active
                 ? `<button class="btn-xs btn-xs-danger" onclick="adminEliminate('${p.id}')">Eliminate</button>`
                 : `<button class="btn-xs btn-xs-success" onclick="adminReinstate('${p.id}')">Reinstate</button>`}
@@ -1817,9 +1849,11 @@ function renderHostResults(round) {
 }
 
 function renderHostRoundDone(round) {
-    const picks    = Object.values(round.picks || {});
-    const survived  = picks.filter(p => p.result === 'win');
-    const eliminated = picks.filter(p => p.result === 'out');
+    const picks       = Object.values(round.picks || {});
+    const survived    = picks.filter(p => p.result === 'win');
+    const eliminated  = picks.filter(p => p.result === 'out');
+    const cycleWinner = round.cycleWinner ? getPlayer(round.cycleWinner) : null;
+    const cycleReset  = cycleWinner || round.cycleNoWinner;
 
     document.getElementById('app').innerHTML = `
         <div class="layout">
@@ -1830,16 +1864,24 @@ function renderHostRoundDone(round) {
                     <h2>Round ${round.id} — Complete</h2>
                     <div class="round-status closed"><div class="dot"></div> Round closed</div>
 
+                    ${cycleReset ? `
+                        <div class="summary-box ${cycleWinner ? 'box-green' : 'box-blue'}" style="margin-bottom:12px">
+                            ${cycleWinner
+                                ? `<h3>🏆 ${esc(cycleWinner.name)} wins this cycle!</h3><p style="margin:4px 0 0;font-size:13px">All players reset — everyone's back in next round.</p>`
+                                : `<h3>🤝 No winner — everyone went out</h3><p style="margin:4px 0 0;font-size:13px">All players reset for the next round.</p>`}
+                        </div>` : ''}
+
                     ${survived.length ? `
                         <div class="summary-box box-green">
-                            <h3>✅ Still in (${survived.length})</h3>
+                            <h3>✅ Won this round (${survived.length})</h3>
                             <ul>${survived.map(p => `<li><strong>${esc(getPlayer(p.playerId)?.name)}</strong> — ${esc(p.team)}</li>`).join('')}</ul>
                         </div>` : ''}
 
                     ${eliminated.length ? `
                         <div class="summary-box box-red">
-                            <h3>❌ Auto-eliminated (${eliminated.length})</h3>
+                            <h3>❌ Out this round (${eliminated.length})</h3>
                             <ul>${eliminated.map(p => `<li><strong>${esc(getPlayer(p.playerId)?.name)}</strong> — ${esc(p.team)} didn't win</li>`).join('')}</ul>
+                            ${!cycleReset ? `<p style="margin:8px 0 0;font-size:13px;color:var(--grey)">These players are out until a winner is found.</p>` : ''}
                         </div>` : ''}
 
                     <div class="divider"></div>
@@ -1983,14 +2025,13 @@ function renderPlayerWaiting(msg) {
 }
 
 function renderPlayerEliminated() {
-    // Feature 6 — survival banner shows elimination details
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
             ${renderHostPlayerBanner()}
             ${renderSurvivalBanner()}
             <div class="card" style="text-align:center;padding:28px 20px">
                 <div style="font-size:36px;margin-bottom:10px">😬</div>
-                <p style="color:var(--grey);font-size:14px;line-height:1.6">You can still watch the rest of the game below.</p>
+                <p style="color:var(--grey);font-size:14px;line-height:1.6">You're out this cycle. Once someone wins, everyone's back in for the next round.</p>
             </div>
             ${renderMyPickHistoryBtn()}
             ${renderPhase3Nav()}
@@ -1999,8 +2040,21 @@ function renderPlayerEliminated() {
 }
 
 function renderPlayerRoundDone(round) {
-    const myPick   = (round.picks || {})[myPlayerId];
-    const survived = myPick?.result === 'win';
+    const myPick      = (round.picks || {})[myPlayerId];
+    const survived    = myPick?.result === 'win';
+    const cycleWinner = round.cycleWinner ? getPlayer(round.cycleWinner) : null;
+    const cycleReset  = cycleWinner || round.cycleNoWinner;
+    const iWon        = round.cycleWinner === myPlayerId;
+
+    const cycleBanner = cycleReset
+        ? `<div class="summary-box ${iWon ? 'box-green' : 'box-blue'}" style="margin-bottom:0">
+               ${iWon
+                   ? `<h3>🏆 You won this cycle!</h3><p style="margin:4px 0 0;font-size:13px">Everyone resets — new cycle starts next round.</p>`
+                   : cycleWinner
+                       ? `<h3>🏆 ${esc(cycleWinner.name)} wins this cycle!</h3><p style="margin:4px 0 0;font-size:13px">Everyone resets — you're back in next round.</p>`
+                       : `<h3>🤝 No winner this cycle</h3><p style="margin:4px 0 0;font-size:13px">Everyone went out — all reset for the next round.</p>`}
+           </div>`
+        : '';
 
     document.getElementById('app').innerHTML = `
         <div class="center-wrap">
@@ -2008,12 +2062,13 @@ function renderPlayerRoundDone(round) {
             ${renderSurvivalBanner()}
             <div class="card">
                 <div class="phase-label">Round ${round.id} — Done</div>
-                <h2>${survived ? '✅ You survived!' : "❌ You're out"}</h2>
-                <p class="help-text" style="margin-bottom:${myPick ? '0' : '0'}">
+                <h2>${survived ? '✅ You survived!' : '❌ Out this round'}</h2>
+                <p class="help-text" style="margin-bottom:${cycleBanner ? '12px' : '0'}">
                     ${survived
-                        ? `${esc(myPick?.team)} won. Waiting for the host to start round ${round.id + 1}.`
+                        ? `${esc(myPick?.team)} won. ${cycleReset ? '' : `Waiting for the host to start round ${round.id + 1}.`}`
                         : `${esc(myPick?.team)} didn't win this weekend.`}
                 </p>
+                ${cycleBanner}
                 ${myPick ? `<button class="copy-result-btn" onclick="copyRoundResult(${round.id})">📋 Copy result to share</button>` : ''}
             </div>
             ${renderRoundPickReveal(round)}
@@ -2109,37 +2164,30 @@ function renderComplete() {
 function renderStandings() {
     if (!G) return '';
     const ps = players();
-    const inPs  = activePlayers().filter(p => p.id !== G.winner);
-    const outPs = ps.filter(p => !p.active).sort((a, b) => (b.eliminatedRound || 0) - (a.eliminatedRound || 0));
-
     let html = '<div class="card"><h2>Standings</h2>';
-
     if (!ps.length) return html + '<div class="empty-state">No players yet.</div></div>';
 
-    if (G.winner) {
-        const w = getPlayer(G.winner);
-        html += `<div class="player-row">
-            <span class="player-name">${esc(w?.name)}</span>
-            <span class="status-pill pill-winner">🏆 Winner</span>
-        </div>`;
-    }
+    const sortByPoints = (a, b) => (b.seasonPoints || 0) - (a.seasonPoints || 0) || a.name.localeCompare(b.name);
+    const activePs = activePlayers().sort(sortByPoints);
+    const outPs    = ps.filter(p => !p.active).sort(sortByPoints);
 
-    const doneRounds = rounds().filter(r => r.status === 'done');
-    inPs.forEach(p => {
-        const survCount = doneRounds.filter(r => (r.picks||{})[p.id]?.result === 'win').length;
+    activePs.forEach((p, i) => {
+        const pts  = p.seasonPoints || 0;
         const isMe = p.id === myPlayerId;
         html += `<div class="player-row">
-            <span class="player-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;color:var(--grey);font-weight:400">(you)</span>' : ''}</span>
-            <span class="status-pill pill-in">${survCount > 0 ? survCount + (survCount === 1 ? ' round' : ' rounds') : 'In'}</span>
+            <span class="player-name">${i + 1}. ${esc(p.name)}${isMe ? ' <span style="font-size:11px;color:var(--grey);font-weight:400">(you)</span>' : ''}</span>
+            <span class="status-pill pill-in">${pts} pt${pts !== 1 ? 's' : ''}</span>
         </div>`;
     });
 
     if (outPs.length) {
-        html += `<div class="divider"></div><div class="section-label">Eliminated</div>`;
+        html += `<div class="divider"></div><div class="section-label">Out this cycle</div>`;
         outPs.forEach(p => {
+            const pts  = p.seasonPoints || 0;
+            const isMe = p.id === myPlayerId;
             html += `<div class="player-row">
-                <span class="player-name elim-name">${esc(p.name)}</span>
-                <span class="status-pill pill-out">Rd ${p.eliminatedRound}</span>
+                <span class="player-name elim-name">${esc(p.name)}${isMe ? ' <span style="font-size:11px;color:var(--grey);font-weight:400">(you)</span>' : ''}</span>
+                <span class="status-pill pill-out">${pts} pt${pts !== 1 ? 's' : ''}</span>
             </div>`;
         });
     }
