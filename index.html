@@ -626,6 +626,20 @@
         }
         .tab-btn.tab-active { background: var(--purple); color: white; }
         .tab-btn:hover:not(.tab-active) { background: var(--light); }
+
+        /* ── Phase 5 — Live data styles ─────────────────────────────────────── */
+        .matchday-info { background: var(--light); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+        .matchday-info .md-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--grey); margin-bottom: 4px; }
+        .matchday-info .md-value { font-size: 15px; font-weight: 700; color: var(--purple); }
+        .matchday-info .md-sub { font-size: 12px; color: var(--grey); margin-top: 3px; }
+        .live-error { background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #9f1239; margin-bottom: 14px; }
+        .auto-status { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #065f46; margin-bottom: 14px; }
+        .match-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+        .match-row:last-child { border-bottom: none; }
+        .match-status-pill { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+        .match-finished { background: #d1fae5; color: #065f46; }
+        .match-live { background: #fee2e2; color: #991b1b; }
+        .match-upcoming { background: #f3f4f6; color: #6b7280; }
     </style>
 </head>
 <body>
@@ -656,8 +670,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
+// ── FOOTBALL API ──────────────────────────────────────────────────────────────
+// Get your free API key at football-data.org
+const FOOTBALL_API_KEY = 'YOUR_KEY_HERE';
+const FOOTBALL_API_BASE = 'https://api.football-data.org/v4';
+
 // ── TEAMS ────────────────────────────────────────────────────────────────────
-const ALL_TEAMS = [
+const FALLBACK_TEAMS = [
     "Arsenal","Aston Villa","Bournemouth","Brentford","Brighton",
     "Chelsea","Crystal Palace","Everton","Fulham","Ipswich Town",
     "Leicester City","Liverpool","Man City","Man United","Newcastle",
@@ -703,6 +722,14 @@ let lastConfirmedTeam = null;
 let countdownTimer    = null;
 let hostView          = 'admin'; // 'admin' | 'player' — host toggling to player view
 
+// Live data state
+let cachedTeams          = null; // string[] from API
+let cachedMatchday       = null; // { matchday, matches, firstKickoff }
+let liveDataError        = null;
+let lastResultsCheck     = null;
+let resultsPollingTimer  = null;
+let autoCloseTimer       = null;
+
 // ── UTILITIES ────────────────────────────────────────────────────────────────
 function esc(s) {
     return String(s)
@@ -728,11 +755,15 @@ function currentRound() {
     return rs[rs.length - 1] || null;
 }
 
+function getTeams() {
+    return cachedTeams || FALLBACK_TEAMS;
+}
+
 function availableTeams(playerId) {
     const p = getPlayer(playerId);
-    if (!p) return ALL_TEAMS;
+    if (!p) return getTeams();
     const used = p.usedTeams || {};
-    return ALL_TEAMS.filter(t => !used[t]);
+    return getTeams().filter(t => !used[t]);
 }
 
 // ── Countdown helpers ─────────────────────────────────────────────────────────
@@ -895,15 +926,34 @@ function listenToGame() {
     gameListener = gameRef.on('value', snap => {
         G = snap.val();
         if (!G) { returnToHome(); return; }
+
+        if (role === 'host') {
+            const round = currentRound();
+            // Resume auto-close if picking round has a kickoff time and timer isn't running
+            if (round?.status === 'picking' && !autoCloseTimer && round.firstKickoff) {
+                if (!cachedMatchday) {
+                    cachedMatchday = { matchday: round.matchday || null, matches: [], firstKickoff: round.firstKickoff };
+                }
+                scheduleAutoClose();
+            }
+            // Resume results polling if round is awaiting results
+            if (round?.status === 'results' && !resultsPollingTimer) {
+                startResultsPolling();
+            }
+        }
+
         render();
     });
 }
 
 function returnToHome() {
-    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    if (countdownTimer)       { clearInterval(countdownTimer);       countdownTimer = null; }
+    if (resultsPollingTimer)  { clearInterval(resultsPollingTimer);  resultsPollingTimer = null; }
+    if (autoCloseTimer)       { clearTimeout(autoCloseTimer);        autoCloseTimer = null; }
     if (gameRef) { gameRef.off('value', gameListener); gameRef = null; }
     gameCode = null; role = null; myPlayerId = null; myName = null; G = null;
     playerSubView = 'main'; lastConfirmedTeam = null; hostView = 'admin';
+    cachedMatchday = null; liveDataError = null; lastResultsCheck = null;
     render();
 }
 
@@ -918,6 +968,203 @@ async function leaveGamePermanently() {
     returnToHome();
     removeGame(code);
     if (pid) await db.ref(`games/${code}/players/${pid}`).remove();
+}
+
+// ── LIVE DATA — API FUNCTIONS ─────────────────────────────────────────────────
+
+function apiConfigured() {
+    return FOOTBALL_API_KEY && FOOTBALL_API_KEY !== 'YOUR_KEY_HERE';
+}
+
+async function apiFetch(endpoint) {
+    if (!apiConfigured()) throw new Error('No API key configured');
+    const res = await fetch(`${FOOTBALL_API_BASE}${endpoint}`, {
+        headers: { 'X-Auth-Token': FOOTBALL_API_KEY }
+    });
+    if (!res.ok) throw new Error(`API error ${res.status}`);
+    return res.json();
+}
+
+async function fetchTeams() {
+    try {
+        const data = await apiFetch('/competitions/PL/teams?season=2024');
+        cachedTeams = data.teams.map(t => t.shortName || t.name).sort();
+        liveDataError = null;
+    } catch (e) {
+        liveDataError = 'Could not load teams — using fallback list.';
+    }
+}
+
+async function fetchFixtures() {
+    try {
+        const comp = await apiFetch('/competitions/PL');
+        const matchday = comp.currentSeason.currentMatchday;
+        const data = await apiFetch(`/competitions/PL/matches?matchday=${matchday}`);
+        const matches = data.matches || [];
+        const kickoffs = matches
+            .filter(m => m.status === 'SCHEDULED' || m.status === 'TIMED')
+            .map(m => m.utcDate).sort();
+        cachedMatchday = { matchday, matches, firstKickoff: kickoffs[0] || null };
+        liveDataError = null;
+        return cachedMatchday;
+    } catch (e) {
+        liveDataError = 'Could not fetch fixtures. Check your API key.';
+        return null;
+    }
+}
+
+async function fetchFinishedMatches() {
+    if (!cachedMatchday) return null;
+    try {
+        const data = await apiFetch(`/competitions/PL/matches?matchday=${cachedMatchday.matchday}`);
+        const matches = data.matches || [];
+        cachedMatchday = { ...cachedMatchday, matches };
+        liveDataError = null;
+        return matches;
+    } catch (e) {
+        liveDataError = 'Could not fetch results.';
+        return null;
+    }
+}
+
+function formatMatchTime(utcDate) {
+    if (!utcDate) return '—';
+    return new Date(utcDate).toLocaleString('en-GB', {
+        weekday: 'short', day: 'numeric', month: 'short',
+        hour: '2-digit', minute: '2-digit'
+    });
+}
+
+async function processResultsFromAPI(matches) {
+    const round = currentRound();
+    if (!round || round.status !== 'results') return;
+
+    // Build set of winning team names (shortName to match what we stored in picks)
+    const winSet = new Set();
+    matches.filter(m => m.status === 'FINISHED').forEach(m => {
+        const h = m.score?.fullTime?.home ?? 0;
+        const a = m.score?.fullTime?.away ?? 0;
+        if (h > a) winSet.add(m.homeTeam.shortName || m.homeTeam.name);
+        else if (a > h) winSet.add(m.awayTeam.shortName || m.awayTeam.name);
+        // draw: neither team wins
+    });
+
+    const picks = Object.values(round.picks || {});
+    const updates = {};
+
+    picks.forEach(pick => {
+        const result = winSet.has(pick.team) ? 'win' : 'out';
+        updates[`games/${gameCode}/rounds/r${round.id}/picks/${pick.playerId}/result`] = result;
+        if (result === 'out') {
+            updates[`games/${gameCode}/players/${pick.playerId}/active`] = false;
+            updates[`games/${gameCode}/players/${pick.playerId}/eliminatedRound`] = round.id;
+        }
+    });
+
+    [...winSet].forEach(t => {
+        updates[`games/${gameCode}/rounds/r${round.id}/winningTeams/${t.replace(/\s+/g,'_')}`] = true;
+    });
+
+    updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'done';
+
+    const survivors = players().filter(p => {
+        if (!p.active) return false;
+        const pick = picks.find(pk => pk.playerId === p.id);
+        return pick && winSet.has(pick.team);
+    });
+
+    if (survivors.length === 1) {
+        updates[`games/${gameCode}/status`] = 'complete';
+        updates[`games/${gameCode}/winner`] = survivors[0].id;
+    } else if (survivors.length === 0) {
+        updates[`games/${gameCode}/status`] = 'complete';
+        updates[`games/${gameCode}/winner`] = null;
+    }
+
+    await db.ref().update(updates);
+}
+
+async function checkAndProcessResults() {
+    if (!gameCode || !G) return;
+    const round = currentRound();
+    if (!round || round.status !== 'results') { stopResultsPolling(); return; }
+
+    lastResultsCheck = new Date();
+    const matches = await fetchFinishedMatches();
+    if (!matches) { render(); return; }
+
+    const DONE_STATUSES = ['FINISHED', 'CANCELLED', 'POSTPONED', 'AWARDED', 'SUSPENDED'];
+    const allDone = matches.length > 0 && matches.every(m => DONE_STATUSES.includes(m.status));
+
+    if (allDone) {
+        stopResultsPolling();
+        await processResultsFromAPI(matches);
+    } else {
+        render();
+    }
+}
+
+function startResultsPolling() {
+    stopResultsPolling();
+    checkAndProcessResults();
+    resultsPollingTimer = setInterval(checkAndProcessResults, 5 * 60 * 1000);
+}
+
+function stopResultsPolling() {
+    if (resultsPollingTimer) { clearInterval(resultsPollingTimer); resultsPollingTimer = null; }
+}
+
+function scheduleAutoClose() {
+    if (autoCloseTimer) { clearTimeout(autoCloseTimer); autoCloseTimer = null; }
+    if (!cachedMatchday?.firstKickoff) return;
+    const closeAt = new Date(cachedMatchday.firstKickoff).getTime() - 60 * 60 * 1000;
+    const delay   = closeAt - Date.now();
+    if (delay <= 0) { autoClosePicks(); return; }
+    autoCloseTimer = setTimeout(autoClosePicks, delay);
+}
+
+async function autoClosePicks() {
+    autoCloseTimer = null;
+    const round = currentRound();
+    if (!round || round.status !== 'picking') return;
+    const picks = Object.values(round.picks || {});
+    const updates = {};
+    picks.filter(p => p.team).forEach(pick => {
+        updates[`games/${gameCode}/players/${pick.playerId}/usedTeams/${pick.team}`] = true;
+    });
+    updates[`games/${gameCode}/rounds/r${round.id}/status`] = 'results';
+    await db.ref().update(updates);
+    startResultsPolling();
+}
+
+async function activateGameweek() {
+    showLoading();
+    await fetchTeams();
+    const fixture = await fetchFixtures();
+    if (!fixture) { render(); return; }
+
+    const roundNum = rounds().length + 1;
+    const picks = {};
+    activePlayers().forEach(p => {
+        picks[p.id] = { playerId: p.id, team: null, result: null };
+    });
+
+    await db.ref(`games/${gameCode}/rounds/r${roundNum}`).set({
+        id: roundNum,
+        status: 'picking',
+        picks,
+        winningTeams: {},
+        matchday: fixture.matchday,
+        firstKickoff: fixture.firstKickoff || null
+    });
+
+    scheduleAutoClose();
+}
+
+async function refreshResults() {
+    liveDataError = null;
+    await checkAndProcessResults();
+    render();
 }
 
 // Host actions
@@ -1360,6 +1607,8 @@ function renderHostSetup() {
 function renderHostNewRound() {
     const num   = rounds().length + 1;
     const count = activePlayers().length;
+    const hasApi = apiConfigured();
+
     document.getElementById('app').innerHTML = `
         <div class="layout">
             <div>
@@ -1368,10 +1617,18 @@ function renderHostNewRound() {
                     <div class="phase-label">Admin — Round Control</div>
                     <h2>Ready for Round ${num}</h2>
                     <div class="round-status closed"><div class="dot"></div> No round open</div>
-                    <p class="help-text">${count} player${count !== 1 ? 's' : ''} still in. Opening the round lets players pick their team immediately.</p>
-                    <button class="btn btn-success btn-full" onclick="hostStartRound()">
-                        🟢 Open Round ${num}
-                    </button>
+                    <p class="help-text">${count} player${count !== 1 ? 's' : ''} still in.</p>
+                    ${liveDataError ? `<div class="live-error">⚠️ ${esc(liveDataError)}</div>` : ''}
+                    ${hasApi
+                        ? `<button class="btn btn-success btn-full" onclick="activateGameweek()">
+                               🟢 Activate Gameweek
+                           </button>
+                           <p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">
+                               Fetches this week's fixtures. Picks close automatically 1 hour before the first kick-off.
+                           </p>`
+                        : `<button class="btn btn-success btn-full" onclick="hostStartRound()">
+                               🟢 Open Round ${num}
+                           </button>`}
                     <div class="divider"></div>
                     <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Reset &amp; New Game</button>
                 </div>
@@ -1382,14 +1639,14 @@ function renderHostNewRound() {
 }
 
 function renderHostPicking(round) {
-    const picks      = Object.values(round.picks || {});
-    const allPicked  = picks.every(p => p.team);
+    const picks       = Object.values(round.picks || {});
+    const allPicked   = picks.every(p => p.team);
     const pickedCount = picks.filter(p => p.team).length;
-    const unpicked   = picks.filter(p => !p.team);
+    const unpicked    = picks.filter(p => !p.team);
+    const hasApi      = apiConfigured();
 
-    // Feature 1 — picks dashboard rows, unpicked highlighted
     const rows = picks.map(pick => {
-        const p      = getPlayer(pick.playerId);
+        const p       = getPlayer(pick.playerId);
         const hasPick = !!pick.team;
         return `<div class="picks-row${hasPick ? '' : ' unpicked'}">
             <span class="pr-name">${esc(p?.name || pick.playerId)}</span>
@@ -1399,6 +1656,39 @@ function renderHostPicking(round) {
         </div>`;
     }).join('');
 
+    const matchesHtml = cachedMatchday?.matches?.length ? `
+        <div style="margin-top:14px">
+            <div class="section-label" style="margin-bottom:6px">Gameweek ${cachedMatchday.matchday} fixtures</div>
+            ${cachedMatchday.matches.slice(0, 6).map(m => {
+                let pill;
+                if (m.status === 'FINISHED') pill = `<span class="match-status-pill match-finished">Done</span>`;
+                else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') pill = `<span class="match-status-pill match-live">Live</span>`;
+                else pill = `<span class="match-status-pill match-upcoming">${formatMatchTime(m.utcDate)}</span>`;
+                return `<div class="match-row">
+                    <span>${esc(m.homeTeam?.shortName || '?')} v ${esc(m.awayTeam?.shortName || '?')}</span>
+                    ${pill}
+                </div>`;
+            }).join('')}
+            ${cachedMatchday.matches.length > 6 ? `<div style="font-size:12px;color:var(--grey);padding-top:6px">+${cachedMatchday.matches.length - 6} more</div>` : ''}
+        </div>` : '';
+
+    const autoInfo = round.firstKickoff
+        ? `<div class="auto-status">⏱ Picks auto-close 1 hour before kick-off (${formatMatchTime(round.firstKickoff)})</div>`
+        : '';
+
+    const manualControls = !hasApi ? `
+        <div class="divider"></div>
+        <button class="btn btn-danger btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
+            🔴 Close Round &amp; Lock Picks
+        </button>
+        ${!allPicked ? `<p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">${unpicked.length} player${unpicked.length !== 1 ? 's' : ''} still to pick.</p>` : ''}
+        <div class="divider"></div>
+        <div class="section-label" style="margin-bottom:6px">Pick deadline (optional)</div>
+        <p style="font-size:12px;color:var(--grey);margin-bottom:8px">Set a time so players see a countdown.</p>
+        <input type="datetime-local" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px"
+            value="${round.closeTime ? formatDatetimeLocal(round.closeTime) : ''}"
+            onchange="hostSetCloseTime(this.value)">` : '';
+
     document.getElementById('app').innerHTML = `
         <div class="layout">
             <div>
@@ -1407,28 +1697,16 @@ function renderHostPicking(round) {
                     <div class="phase-label">Admin — Round Control</div>
                     <h2>Round ${round.id} — Picks Dashboard</h2>
                     <div class="round-status open"><div class="dot"></div> Round open</div>
-
+                    ${autoInfo}
                     <div class="section-label" style="margin-bottom:8px">Picks received (${pickedCount} / ${picks.length})</div>
                     ${rows}
-
                     ${unpicked.length ? `
                         <div class="divider"></div>
                         <button class="btn btn-outline btn-full btn-sm" onclick="copyReminderLink()">
-                            📲 Copy reminder link (${unpicked.length} haven't picked)
+                            📲 Copy reminder (${unpicked.length} haven't picked)
                         </button>` : ''}
-
-                    <div class="divider"></div>
-                    <button class="btn btn-danger btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
-                        🔴 Close Round &amp; Lock Picks
-                    </button>
-                    ${!allPicked ? `<p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">${unpicked.length} player${unpicked.length !== 1 ? 's' : ''} still to pick.</p>` : ''}
-
-                    <div class="divider"></div>
-                    <div class="section-label" style="margin-bottom:6px">Pick deadline (optional)</div>
-                    <p style="font-size:12px;color:var(--grey);margin-bottom:8px">Set a time so players see a countdown on their phones.</p>
-                    <input type="datetime-local" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px"
-                        value="${round.closeTime ? formatDatetimeLocal(round.closeTime) : ''}"
-                        onchange="hostSetCloseTime(this.value)">
+                    ${manualControls}
+                    ${matchesHtml}
                 </div>
             </div>
             <div>${renderStandings()}${renderResultsFeed()}</div>
@@ -1436,23 +1714,74 @@ function renderHostPicking(round) {
 }
 
 function renderHostResults(round) {
-    const picks = Object.values(round.picks || {});
-    const pickedTeams = [...new Set(picks.map(p => p.team))].sort();
+    const hasApi = apiConfigured();
 
-    const rows = pickedTeams.map(team => {
-        const who    = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
-        const safeId = team.replace(/\s+/g, '_');
-        return `
-            <div class="result-row" onclick="document.getElementById('cb_${safeId}').click();updateEliminationPreview()">
-                <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
-                    onclick="event.stopPropagation()" onchange="updateEliminationPreview()">
-                <label for="cb_${safeId}">
-                    ${esc(team)}
-                    <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
-                </label>
-                <span style="font-size:12px;color:var(--grey)">won ✓</span>
+    if (!hasApi) {
+        // Manual mode — original checkbox UI
+        const picks = Object.values(round.picks || {});
+        const pickedTeams = [...new Set(picks.map(p => p.team))].sort();
+        const rows = pickedTeams.map(team => {
+            const who    = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
+            const safeId = team.replace(/\s+/g, '_');
+            return `
+                <div class="result-row" onclick="document.getElementById('cb_${safeId}').click();updateEliminationPreview()">
+                    <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
+                        onclick="event.stopPropagation()" onchange="updateEliminationPreview()">
+                    <label for="cb_${safeId}">
+                        ${esc(team)}
+                        <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
+                    </label>
+                    <span style="font-size:12px;color:var(--grey)">won ✓</span>
+                </div>`;
+        }).join('');
+        document.getElementById('app').innerHTML = `
+            <div class="layout">
+                <div>
+                    <div class="card">
+                        ${renderAdminTab()}
+                        <div class="phase-label">Round ${round.id} — Results</div>
+                        <h2>Which teams won?</h2>
+                        <p class="help-text">Tick every team that won. Draws and losses = eliminated.</p>
+                        ${rows}
+                        <div class="divider"></div>
+                        <div class="elim-preview" id="elimPreview">
+                            <p style="color:var(--grey)">Tick the teams that won to see who survives.</p>
+                        </div>
+                        <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
+                            Submit Results &amp; Eliminate →
+                        </button>
+                    </div>
+                </div>
+                <div>${renderStandings()}${renderResultsFeed()}</div>
             </div>`;
+        return;
+    }
+
+    // API mode — auto-processing
+    const matches = cachedMatchday?.matches || [];
+    const DONE_STATUSES = ['FINISHED', 'CANCELLED', 'POSTPONED', 'AWARDED', 'SUSPENDED'];
+    const allDone = matches.length > 0 && matches.every(m => DONE_STATUSES.includes(m.status));
+
+    const matchRows = matches.map(m => {
+        let pill;
+        if (m.status === 'FINISHED') {
+            const h = m.score?.fullTime?.home ?? '?';
+            const a = m.score?.fullTime?.away ?? '?';
+            pill = `<span class="match-status-pill match-finished">${h}–${a}</span>`;
+        } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
+            pill = `<span class="match-status-pill match-live">Live</span>`;
+        } else {
+            pill = `<span class="match-status-pill match-upcoming">${formatMatchTime(m.utcDate)}</span>`;
+        }
+        return `<div class="match-row">
+            <span>${esc(m.homeTeam?.shortName || '?')} v ${esc(m.awayTeam?.shortName || '?')}</span>
+            ${pill}
+        </div>`;
     }).join('');
+
+    const statusMsg = allDone
+        ? '✅ All matches finished — applying results now...'
+        : `⏳ Watching for results. Checks every 5 min.${lastResultsCheck ? ' Last: ' + lastResultsCheck.toLocaleTimeString('en-GB') : ''}`;
 
     document.getElementById('app').innerHTML = `
         <div class="layout">
@@ -1460,19 +1789,14 @@ function renderHostResults(round) {
                 <div class="card">
                     ${renderAdminTab()}
                     <div class="phase-label">Round ${round.id} — Results</div>
-                    <h2>Which teams won?</h2>
-                    <p class="help-text">
-                        Tick every team that won this weekend. Draws and losses = eliminated.
-                        Unticked teams eliminate that player.
-                    </p>
-                    ${rows}
-                    <div class="divider"></div>
-                    <div class="elim-preview" id="elimPreview">
-                        <p style="color:var(--grey)">Tick the teams that won to see who survives.</p>
-                    </div>
-                    <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
-                        Submit Results &amp; Eliminate →
-                    </button>
+                    <h2>Auto-processing results</h2>
+                    ${liveDataError ? `<div class="live-error">⚠️ ${esc(liveDataError)}</div>` : ''}
+                    <div class="auto-status">${statusMsg}</div>
+                    ${matchRows ? `
+                        <div class="section-label" style="margin-bottom:6px">Gameweek ${cachedMatchday?.matchday || ''} matches</div>
+                        ${matchRows}
+                        <div class="divider"></div>` : ''}
+                    <button class="btn btn-outline btn-full btn-sm" onclick="refreshResults()">🔄 Refresh Now</button>
                 </div>
             </div>
             <div>${renderStandings()}${renderResultsFeed()}</div>
@@ -1506,9 +1830,13 @@ function renderHostRoundDone(round) {
                         </div>` : ''}
 
                     <div class="divider"></div>
-                    <button class="btn btn-success btn-full" onclick="hostStartRound()">
-                        🟢 Open Round ${round.id + 1}
-                    </button>
+                    ${apiConfigured()
+                        ? `<button class="btn btn-success btn-full" onclick="activateGameweek()">
+                               🟢 Activate Next Gameweek
+                           </button>`
+                        : `<button class="btn btn-success btn-full" onclick="hostStartRound()">
+                               🟢 Open Round ${round.id + 1}
+                           </button>`}
                 </div>
                 ${renderAdminPlayerManagement()}
             </div>
@@ -1572,7 +1900,7 @@ function renderPlayerPicking(round) {
     const usedTeams = myPlayer?.usedTeams || {};
 
     // Feature 4 — all 20 teams; used ones greyed out, available ones tappable
-    const teamGrid = ALL_TEAMS.map(t => {
+    const teamGrid = getTeams().map(t => {
         const isUsed     = !!usedTeams[t];
         const isSelected = myPick.team === t;
         if (isUsed) {
