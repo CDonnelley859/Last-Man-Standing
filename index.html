@@ -676,9 +676,9 @@ const db = firebase.database();
 // ── TEAMS ────────────────────────────────────────────────────────────────────
 const FALLBACK_TEAMS = [
     "Arsenal","Aston Villa","Bournemouth","Brentford","Brighton",
-    "Chelsea","Crystal Palace","Everton","Fulham","Ipswich Town",
-    "Leicester City","Liverpool","Man City","Man United","Newcastle",
-    "Nottm Forest","Southampton","Tottenham","West Ham","Wolves"
+    "Burnley","Chelsea","Crystal Palace","Everton","Fulham",
+    "Leeds United","Liverpool","Man City","Man United","Newcastle",
+    "Nottm Forest","Sunderland","Tottenham","West Ham","Wolves"
 ];
 
 // ── LOCALSTORAGE HELPERS ──────────────────────────────────────────────────────
@@ -892,13 +892,17 @@ async function joinGame(code, name) {
     name = name.trim();
     if (!code || !name) { showHomeError('Enter both a game code and your name.'); return; }
 
+    // If this code is already saved as a game we're in, just continue it
+    const alreadySaved = savedGames().find(g => g.code === code);
+    if (alreadySaved) { await continueGame(code); return; }
+
     showLoading();
 
     const snap = await db.ref(`games/${code}`).once('value');
     if (!snap.exists()) { showHomeError('Game not found — double-check the code.'); return; }
 
     const game = snap.val();
-    if (game.status !== 'setup') { showHomeError('That game has already started.'); return; }
+    if (game.status !== 'setup') { showHomeError('That game has already started — ask the host for a new game.'); return; }
 
     const taken = Object.values(game.players || {}).some(
         p => p.name.toLowerCase() === name.toLowerCase()
@@ -980,10 +984,21 @@ async function apiFetch(endpoint) {
     return res.json();
 }
 
+const TEAM_NAME_FIXES = {
+    'Brighton Hove': 'Brighton',
+    'Wolverhampton': 'Wolves',
+    'Nottingham':    'Nottm Forest',
+};
+
 async function fetchTeams() {
     try {
-        const data = await apiFetch('/competitions/PL/teams?season=2024');
-        cachedTeams = data.teams.map(t => t.shortName || t.name).sort();
+        const data = await apiFetch('/competitions/PL/teams?season=2025');
+        cachedTeams = data.teams
+            .map(t => {
+                const raw = t.shortName || t.name;
+                return TEAM_NAME_FIXES[raw] || raw;
+            })
+            .sort();
         liveDataError = null;
     } catch (e) {
         liveDataError = 'Could not load teams — using fallback list.';
@@ -1164,7 +1179,6 @@ async function refreshResults() {
 
 // Host actions
 async function hostStartGame() {
-    if (players().length < 2) return;
     await db.ref(`games/${gameCode}/status`).set('active');
 }
 
@@ -1582,14 +1596,10 @@ function renderHostSetup() {
                     <div class="section-label">Players joined (${ps.length})</div>
                     ${listHtml}
 
-                    ${others.length >= 1 ? `
-                        <div class="divider"></div>
-                        <button class="btn btn-success btn-full" onclick="hostStartGame()">
-                            Start Game with ${ps.length} Players →
-                        </button>` : `
-                        <p style="font-size:13px;color:var(--grey);text-align:center;margin-top:16px">
-                            Waiting for at least 1 more player to join.
-                        </p>`}
+                    <div class="divider"></div>
+                    <button class="btn btn-success btn-full" onclick="hostStartGame()">
+                        Start Game with ${ps.length} Player${ps.length !== 1 ? 's' : ''} →
+                    </button>
 
                     <div class="divider"></div>
                     <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Cancel &amp; Delete Game</button>
@@ -1614,16 +1624,15 @@ function renderHostNewRound() {
                     <div class="round-status closed"><div class="dot"></div> No round open</div>
                     <p class="help-text">${count} player${count !== 1 ? 's' : ''} still in.</p>
                     ${liveDataError ? `<div class="live-error">⚠️ ${esc(liveDataError)}</div>` : ''}
-                    ${hasApi
-                        ? `<button class="btn btn-success btn-full" onclick="activateGameweek()">
-                               🟢 Activate Gameweek
-                           </button>
-                           <p style="font-size:12px;color:var(--grey);text-align:center;margin-top:8px">
-                               Fetches this week's fixtures. Picks close automatically 1 hour before the first kick-off.
-                           </p>`
-                        : `<button class="btn btn-success btn-full" onclick="hostStartRound()">
-                               🟢 Open Round ${num}
-                           </button>`}
+                    <button class="btn btn-success btn-full" onclick="activateGameweek()" style="margin-bottom:8px">
+                        🌐 Activate Gameweek (auto)
+                    </button>
+                    <p style="font-size:12px;color:var(--grey);text-align:center;margin-bottom:14px">
+                        Fetches live fixtures. Picks close 1 hour before kick-off.
+                    </p>
+                    <button class="btn btn-outline btn-full btn-sm" onclick="hostStartRound()">
+                        🟢 Open Round ${num} manually
+                    </button>
                     <div class="divider"></div>
                     <button class="btn btn-outline btn-full btn-sm" onclick="confirmReset()">Reset &amp; New Game</button>
                 </div>
@@ -1671,7 +1680,7 @@ function renderHostPicking(round) {
         ? `<div class="auto-status">⏱ Picks auto-close 1 hour before kick-off (${formatMatchTime(round.firstKickoff)})</div>`
         : '';
 
-    const manualControls = !hasApi ? `
+    const manualControls = `
         <div class="divider"></div>
         <button class="btn btn-danger btn-full" onclick="hostLockPicks()" ${allPicked ? '' : 'disabled'}>
             🔴 Close Round &amp; Lock Picks
@@ -1682,7 +1691,7 @@ function renderHostPicking(round) {
         <p style="font-size:12px;color:var(--grey);margin-bottom:8px">Set a time so players see a countdown.</p>
         <input type="datetime-local" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px"
             value="${round.closeTime ? formatDatetimeLocal(round.closeTime) : ''}"
-            onchange="hostSetCloseTime(this.value)">` : '';
+            onchange="hostSetCloseTime(this.value)">`;
 
     document.getElementById('app').innerHTML = `
         <div class="layout">
@@ -1709,74 +1718,55 @@ function renderHostPicking(round) {
 }
 
 function renderHostResults(round) {
-    const hasApi = apiConfigured();
+    const picks = Object.values(round.picks || {});
+    const pickedTeams = [...new Set(picks.map(p => p.team).filter(Boolean))].sort();
 
-    if (!hasApi) {
-        // Manual mode — original checkbox UI
-        const picks = Object.values(round.picks || {});
-        const pickedTeams = [...new Set(picks.map(p => p.team))].sort();
-        const rows = pickedTeams.map(team => {
-            const who    = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
-            const safeId = team.replace(/\s+/g, '_');
-            return `
-                <div class="result-row" onclick="document.getElementById('cb_${safeId}').click();updateEliminationPreview()">
-                    <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
-                        onclick="event.stopPropagation()" onchange="updateEliminationPreview()">
-                    <label for="cb_${safeId}">
-                        ${esc(team)}
-                        <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
-                    </label>
-                    <span style="font-size:12px;color:var(--grey)">won ✓</span>
-                </div>`;
-        }).join('');
-        document.getElementById('app').innerHTML = `
-            <div class="layout">
-                <div>
-                    <div class="card">
-                        ${renderAdminTab()}
-                        <div class="phase-label">Round ${round.id} — Results</div>
-                        <h2>Which teams won?</h2>
-                        <p class="help-text">Tick every team that won. Draws and losses = eliminated.</p>
-                        ${rows}
-                        <div class="divider"></div>
-                        <div class="elim-preview" id="elimPreview">
-                            <p style="color:var(--grey)">Tick the teams that won to see who survives.</p>
-                        </div>
-                        <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
-                            Submit Results &amp; Eliminate →
-                        </button>
-                    </div>
-                </div>
-                <div>${renderStandings()}${renderResultsFeed()}</div>
-            </div>`;
-        return;
-    }
-
-    // API mode — auto-processing
+    // API status panel (shown if we have live match data)
     const matches = cachedMatchday?.matches || [];
     const DONE_STATUSES = ['FINISHED', 'CANCELLED', 'POSTPONED', 'AWARDED', 'SUSPENDED'];
     const allDone = matches.length > 0 && matches.every(m => DONE_STATUSES.includes(m.status));
 
-    const matchRows = matches.map(m => {
-        let pill;
-        if (m.status === 'FINISHED') {
-            const h = m.score?.fullTime?.home ?? '?';
-            const a = m.score?.fullTime?.away ?? '?';
-            pill = `<span class="match-status-pill match-finished">${h}–${a}</span>`;
-        } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
-            pill = `<span class="match-status-pill match-live">Live</span>`;
-        } else {
-            pill = `<span class="match-status-pill match-upcoming">${formatMatchTime(m.utcDate)}</span>`;
-        }
-        return `<div class="match-row">
-            <span>${esc(m.homeTeam?.shortName || '?')} v ${esc(m.awayTeam?.shortName || '?')}</span>
-            ${pill}
-        </div>`;
-    }).join('');
+    const apiPanel = matches.length ? `
+        ${liveDataError ? `<div class="live-error">⚠️ ${esc(liveDataError)}</div>` : ''}
+        <div class="auto-status" style="margin-bottom:10px">
+            ${allDone
+                ? '✅ All matches done — results applied automatically.'
+                : `⏳ Watching for results (checks every 5 min).${lastResultsCheck ? ' Last: ' + lastResultsCheck.toLocaleTimeString('en-GB') : ''}`}
+        </div>
+        ${matches.map(m => {
+            let pill;
+            if (m.status === 'FINISHED') {
+                const h = m.score?.fullTime?.home ?? '?';
+                const a = m.score?.fullTime?.away ?? '?';
+                pill = `<span class="match-status-pill match-finished">${h}–${a}</span>`;
+            } else if (m.status === 'IN_PLAY' || m.status === 'PAUSED') {
+                pill = `<span class="match-status-pill match-live">Live</span>`;
+            } else {
+                pill = `<span class="match-status-pill match-upcoming">${formatMatchTime(m.utcDate)}</span>`;
+            }
+            return `<div class="match-row">
+                <span>${esc(m.homeTeam?.shortName || '?')} v ${esc(m.awayTeam?.shortName || '?')}</span>
+                ${pill}
+            </div>`;
+        }).join('')}
+        <button class="btn btn-outline btn-full btn-sm" style="margin-top:10px" onclick="refreshResults()">🔄 Refresh Now</button>
+        <div class="divider"></div>` : '';
 
-    const statusMsg = allDone
-        ? '✅ All matches finished — applying results now...'
-        : `⏳ Watching for results. Checks every 5 min.${lastResultsCheck ? ' Last: ' + lastResultsCheck.toLocaleTimeString('en-GB') : ''}`;
+    // Manual checkbox rows — always shown
+    const rows = pickedTeams.map(team => {
+        const who    = picks.filter(p => p.team === team).map(p => getPlayer(p.playerId)?.name).filter(Boolean).join(', ');
+        const safeId = team.replace(/\s+/g, '_');
+        return `
+            <div class="result-row" onclick="document.getElementById('cb_${safeId}').click();updateEliminationPreview()">
+                <input type="checkbox" id="cb_${safeId}" value="${esc(team)}"
+                    onclick="event.stopPropagation()" onchange="updateEliminationPreview()">
+                <label for="cb_${safeId}">
+                    ${esc(team)}
+                    <span style="font-size:12px;color:var(--grey);font-weight:400"> — ${esc(who)}</span>
+                </label>
+                <span style="font-size:12px;color:var(--grey)">won ✓</span>
+            </div>`;
+    }).join('');
 
     document.getElementById('app').innerHTML = `
         <div class="layout">
@@ -1784,14 +1774,17 @@ function renderHostResults(round) {
                 <div class="card">
                     ${renderAdminTab()}
                     <div class="phase-label">Round ${round.id} — Results</div>
-                    <h2>Auto-processing results</h2>
-                    ${liveDataError ? `<div class="live-error">⚠️ ${esc(liveDataError)}</div>` : ''}
-                    <div class="auto-status">${statusMsg}</div>
-                    ${matchRows ? `
-                        <div class="section-label" style="margin-bottom:6px">Gameweek ${cachedMatchday?.matchday || ''} matches</div>
-                        ${matchRows}
-                        <div class="divider"></div>` : ''}
-                    <button class="btn btn-outline btn-full btn-sm" onclick="refreshResults()">🔄 Refresh Now</button>
+                    <h2>Which teams won?</h2>
+                    ${apiPanel}
+                    <p class="help-text">Tick every team that won. Draws and losses = eliminated.</p>
+                    ${rows}
+                    <div class="divider"></div>
+                    <div class="elim-preview" id="elimPreview">
+                        <p style="color:var(--grey)">Tick the teams that won to see who survives.</p>
+                    </div>
+                    <button class="btn btn-primary btn-full" onclick="hostSubmitResults()">
+                        Submit Results &amp; Eliminate →
+                    </button>
                 </div>
             </div>
             <div>${renderStandings()}${renderResultsFeed()}</div>
@@ -1825,13 +1818,12 @@ function renderHostRoundDone(round) {
                         </div>` : ''}
 
                     <div class="divider"></div>
-                    ${apiConfigured()
-                        ? `<button class="btn btn-success btn-full" onclick="activateGameweek()">
-                               🟢 Activate Next Gameweek
-                           </button>`
-                        : `<button class="btn btn-success btn-full" onclick="hostStartRound()">
-                               🟢 Open Round ${round.id + 1}
-                           </button>`}
+                    <button class="btn btn-success btn-full" onclick="activateGameweek()" style="margin-bottom:8px">
+                        🌐 Activate Next Gameweek (auto)
+                    </button>
+                    <button class="btn btn-outline btn-full btn-sm" onclick="hostStartRound()">
+                        🟢 Open Round ${round.id + 1} manually
+                    </button>
                 </div>
                 ${renderAdminPlayerManagement()}
             </div>
